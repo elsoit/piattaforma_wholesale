@@ -1,0 +1,20 @@
+version: 1.0
+runtime: nodejs18
+build:
+  commands:
+    pre-build:
+      - npm ci
+    build:
+      - npm run build
+    post-build:
+      - npm prune --production
+artifacts:
+  files:
+    - '**/*'
+  exclude:
+    - node_modules/**/*
+    - src/**/*
+    - test/**/*
+    - e2e/**/*
+    - coverage/**/*
+    - .git/**/* 

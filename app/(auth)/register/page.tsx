@@ -1,66 +1,90 @@
 'use client'
 import { RegisterForm } from '@/components/auth/register-form'
 import { Logo } from '@/components/ui/logo'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
-export default function RegisterPage() {
+// Creiamo un componente separato per gli step
+interface StepsIndicatorProps {
+  currentStep: number;
+}
+
+function StepsIndicator({ currentStep }: StepsIndicatorProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="mb-4">
-            <Logo className="h-12 w-auto mx-auto" />
+    <div className="mb-8">
+      <div className="flex items-center space-x-8">
+        <div className="flex flex-col items-center">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+            ${currentStep === 1 
+              ? 'border-2 border-black text-black' 
+              : 'bg-green-500 text-white'}`}
+          >
+            {currentStep === 1 ? '1' : '✓'}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Registrazione Nuovo Account
-          </h1>
-          <p className="text-gray-600">
-            Completa i passaggi per creare il tuo account aziendale
-          </p>
+          <span className="mt-2 text-xs text-gray-600">Personal Info</span>
         </div>
-
-        {/* Steps Indicator */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-between text-sm">
-              <div className="bg-gray-50 px-4">
-                <span className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full">
-                  1
-                </span>
-                <span className="mt-2 block text-xs text-gray-500">
-                  Dati Personali
-                </span>
-              </div>
-              <div className="bg-gray-50 px-4">
-                <span className="flex items-center justify-center w-8 h-8 bg-gray-200 text-gray-600 rounded-full">
-                  2
-                </span>
-                <span className="mt-2 block text-xs text-gray-500">
-                  Dati Aziendali
-                </span>
-              </div>
-            </div>
+        <div className="flex-1 h-px bg-gray-200" />
+        <div className="flex flex-col items-center">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+            ${currentStep === 2 
+              ? 'border-2 border-black text-black' 
+              : 'border-2 border-gray-200 text-gray-400'}`}
+          >
+            2
           </div>
-        </div>
-
-        {/* Registration Form */}
-        <div className="max-w-2xl mx-auto">
-          <RegisterForm />
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-500">
-          <p>
-            Hai già un account?{' '}
-            <a href="/login" className="text-blue-600 hover:text-blue-500">
-              Accedi qui
-            </a>
-          </p>
+          <span className="mt-2 text-xs text-gray-600">Business Info</span>
         </div>
       </div>
     </div>
   )
+}
+
+// Desktop Component
+function DesktopRegister() {
+  return (
+    <div className="min-h-screen flex">
+      <div className="fixed top-0 left-0 w-1/3 h-full bg-[#F3F0F5]">
+        <div className="absolute top-8 left-8 z-10">
+          <Logo className="h-8 w-auto text-white" />
+        </div>
+        <div className="h-full w-full">
+          <video 
+            src="https://cdn.dribbble.com/uploads/48226/original/b8bd4e4273cceae2889d9d259b04f732.mp4?1689028949"
+            alt="Authentication illustration"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      </div>
+
+      <div className="ml-[45.1%] flex-1 min-h-screen flex items-center justify-center">
+        <div className="w-[480px] px-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              Create New Account
+            </h1>
+            <p className="mt-2 text-base text-gray-600">
+              Complete the steps to create your business account
+            </p>
+          </div>
+          <RegisterForm StepsIndicator={StepsIndicator} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Mobile Component
+function MobileRegister() {
+  return (
+    <div className="min-h-screen flex flex-col items-center px-4 py-8">
+      <Logo className="h-8 w-auto text-blue-600 mb-8" />
+      <div className="w-full max-w-[400px]">
+        <RegisterForm StepsIndicator={StepsIndicator} />
+      </div>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
+  return isDesktop ? <DesktopRegister /> : <MobileRegister />
 }

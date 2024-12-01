@@ -2,7 +2,8 @@
 import type { Metadata } from "next"
 import localFont from "next/font/local"
 import "./globals.css"
-import "./transition.css"
+import '@/styles/phone-input.css'
+import { Toaster } from "sonner"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,8 +24,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen bg-background font-sans antialiased transition-margin">
+      <body className="min-h-screen bg-background font-sans antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
   )

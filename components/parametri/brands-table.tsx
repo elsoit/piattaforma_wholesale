@@ -26,19 +26,14 @@ export function BrandsTable() {
       setIsLoading(true)
       const response = await fetch('/api/brands')
       
-      // Stampa di debug
-      console.log('Response status:', response.status)
-      
-      const data = await response.json()
-      
-      // Stampa di debug
-      console.log('Received data:', data)
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Errore nel caricamento')
+        throw new Error('Errore nel caricamento')
       }
 
-      setBrands(data || [])
+      const { data } = await response.json()
+      
+      setBrands(Array.isArray(data) ? data : [])
+      
     } catch (error) {
       console.error('Errore nel caricamento dei brands:', error)
       toast.error('Errore nel caricamento dei brands')
@@ -150,7 +145,7 @@ export function BrandsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {brands.length === 0 ? (
+          {!brands || brands.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center">
                 Nessun brand trovato

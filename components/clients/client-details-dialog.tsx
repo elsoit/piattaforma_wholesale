@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
-import { Trash2, RefreshCw, Ban } from 'lucide-react'
+import { Trash2, RefreshCw, Ban, Check, X } from 'lucide-react'
 import { BUSINESS_TYPES, COUNTRIES } from '@/lib/constants/variants'
 
 interface ClientDetailsDialogProps {
@@ -39,6 +39,12 @@ interface Client {
   zip_code: string
   pec?: string
   sdi?: string
+  brands?: Brand[]
+}
+
+interface Brand {
+  id: string
+  name: string
 }
 
 const renderSelectField = (
@@ -86,24 +92,65 @@ const renderInputField = (
   )
 }
 
+const fetchBrands = async (clientId: string) => {
+  try {
+    const [brandsResponse, clientBrandsResponse] = await Promise.all([
+      fetch('/api/brands'),
+      fetch(`/api/clients/${clientId}/brands`)
+    ])
+    
+    const { data: allBrands } = await brandsResponse.json()
+    const { data: clientBrands } = await clientBrandsResponse.json()
+    
+    return { allBrands, clientBrands }
+  } catch (error) {
+    console.error('Errore nel caricamento dei brand:', error)
+    throw error
+  }
+}
+
 export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientDetailsDialogProps) {
+  // Inizializza gli stati con array vuoti
   const [mounted, setMounted] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState(client)
   const [isLoading, setIsLoading] = useState(false)
   const [localClient, setLocalClient] = useState(client)
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [selectedBrands, setSelectedBrands] = useState<Brand[]>([])
+  const [openBrandSelector, setOpenBrandSelector] = useState(false)
 
-  // Gestisci il mounting del componente
+  // Effect per il mounting
   useEffect(() => {
     setMounted(true)
     return () => setMounted(false)
   }, [])
 
-  // Aggiorna i dati locali quando il client cambia
+  // Effect per aggiornare i dati locali quando il client cambia
   useEffect(() => {
     setFormData(client)
     setLocalClient(client)
   }, [client])
+
+  // Effect per caricare i brand
+  useEffect(() => {
+    const loadBrands = async () => {
+      try {
+        const { allBrands, clientBrands } = await fetchBrands(client.id)
+        setBrands(allBrands || [])  // Fallback a array vuoto
+        setSelectedBrands(clientBrands || [])  // Fallback a array vuoto
+      } catch (error) {
+        console.error('Errore nel caricamento dei brand:', error)
+        toast.error('Errore nel caricamento dei brand')
+        setBrands([])
+        setSelectedBrands([])
+      }
+    }
+
+    if (client?.id) {
+      loadBrands()
+    }
+  }, [client?.id])
 
   // Non renderizzare nulla finché non siamo sul client
   if (!mounted) {
@@ -299,6 +346,112 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
     }
   }
 
+  const handleUpdateBrands = async (updatedBrands: Brand[]) => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/clients/${client.id}/brands`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          brandIds: updatedBrands.map(b => b.id) 
+        })
+      })
+
+      if (!response.ok) throw new Error('Errore nell\'aggiornamento dei brand')
+
+      setSelectedBrands(updatedBrands)
+      toast.success('Brand aggiornati con successo')
+    } catch (error) {
+      console.error('Errore:', error)
+      toast.error('Errore nell\'aggiornamento dei brand')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const renderBrandSelector = () => {
+    const brandsList = brands || [];
+    const selectedList = selectedBrands || [];
+    
+    return (
+      <div>
+        <h3 className="text-lg font-medium mb-4">Brand Associati</h3>
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setOpenBrandSelector(!openBrandSelector)}
+            >
+              {selectedList.length > 0
+                ? `${selectedList.length} brand selezionati`
+                : "Seleziona brand"}
+            </Button>
+
+            {openBrandSelector && (
+              <div className="absolute z-50 w-full mt-1 bg-white rounded-md shadow-lg border">
+                <div className="p-2">
+                  <input
+                    type="text"
+                    placeholder="Cerca brand..."
+                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    onChange={(e) => {
+                      // Implementa la ricerca se necessario
+                    }}
+                  />
+                </div>
+                <div className="max-h-60 overflow-auto">
+                  {brandsList.map((brand) => {
+                    if (!brand?.id) return null;
+                    const isSelected = selectedList.some(
+                      (selectedBrand) => selectedBrand.id === brand.id
+                    );
+                    return (
+                      <div
+                        key={brand.id}
+                        className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-gray-100 ${
+                          isSelected ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => {
+                          const updatedBrands = isSelected
+                            ? selectedList.filter((b) => b.id !== brand.id)
+                            : [...selectedList, brand];
+                          handleUpdateBrands(updatedBrands);
+                          setOpenBrandSelector(false);
+                        }}
+                      >
+                        {isSelected ? (
+                          <Check className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <div className="w-4 h-4" />
+                        )}
+                        <span>{brand.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {selectedList.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedList.map((brand) => (
+                <div
+                  key={brand.id}
+                  className="bg-blue-100 text-blue-800 text-sm rounded-full px-3 py-1"
+                >
+                  {brand.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Dialog 
       open={isOpen} 
@@ -459,6 +612,8 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                 </div>
               </div>
             </div>
+
+            {renderBrandSelector()}
           </div>
         </div>
 

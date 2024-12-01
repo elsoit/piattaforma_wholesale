@@ -1,19 +1,27 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 
 export async function POST() {
-  try {
-    // Ottieni i cookie in modo asincrono
-    const cookieStore = await cookies()
-    cookieStore.delete('session')
-    cookieStore.delete('ruolo')
+  const response = NextResponse.json({ success: true })
 
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Errore logout:', error)
-    return NextResponse.json(
-      { error: 'Errore durante il logout' },
-      { status: 500 }
-    )
-  }
+  // Rimuovi tutti i cookie rilevanti
+  response.cookies.delete('session')
+  response.cookies.delete('user_role')
+  response.cookies.delete('client_id')
+
+  // Imposta i cookie come scaduti
+  response.cookies.set('session', '', {
+    expires: new Date(0),
+    path: '/'
+  })
+  response.cookies.set('user_role', '', {
+    expires: new Date(0),
+    path: '/'
+  })
+  response.cookies.set('client_id', '', {
+    expires: new Date(0),
+    path: '/'
+  })
+
+  console.log('Logout - Cookies rimossi')
+  return response
 } 

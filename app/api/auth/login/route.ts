@@ -1,98 +1,110 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcrypt'
-import { cookies } from 'next/headers'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+interface LoginRequest {
+  email: string;
+  password: string;
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    console.log('Dati ricevuti:', { 
-      email: body.email,
-      passwordLength: body.password?.length 
-    })
+    const { email, password } = (await request.json()) as LoginRequest
 
-    const { email, password } = body
+    // Query modificata per includere il campo attivo
+    const userQuery = `
+      SELECT 
+        u.id,
+        u.email,
+        u.password,
+        u.ruolo,
+        u.attivo,
+        CASE 
+          WHEN u.ruolo = 'cliente' THEN c.id 
+          ELSE NULL 
+        END as client_id,
+        CASE 
+          WHEN u.ruolo = 'cliente' THEN c.stato 
+          ELSE NULL 
+        END as client_stato
+      FROM users u
+      LEFT JOIN clients c ON u.id = c.user_id
+      WHERE u.email = $1
+    `
+    const { rows: [user] } = await db.query(userQuery, [email.toLowerCase()])
 
-    // Query al database
-    const result = await db.query(
-      'SELECT id, email, password, ruolo, attivo FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    )
-
-    const user = result.rows[0]
-    
     if (!user) {
-      console.log('Utente non trovato')
       return NextResponse.json(
-        { error: 'Credenziali non valide' },
+        { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
 
-    // Controllo se l'utente è attivo
-    if (!user.attivo) {
-      console.log('Utente non attivo')
+    // Verifica password
+    const validPassword = await bcrypt.compare(password, user.password)
+    if (!validPassword) {
       return NextResponse.json(
-        { error: 'Account non attivo. Contattare l\'amministratore.' },
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      )
+    }
+
+    // Verifica se l'utente è attivo
+    if (!user.attivo) {
+      return NextResponse.json(
+        { error: 'Your account is not active yet. Please wait for activation.' },
         { status: 403 }
       )
     }
 
-    console.log('Password ricevuta:', password)
-    console.log('Password nel DB:', user.password)
-
-    try {
-      const passwordMatch = await bcrypt.compare(password, user.password)
-      console.log('Risultato confronto password:', passwordMatch)
-
-      if (!passwordMatch) {
-        return NextResponse.json(
-          { error: 'Password non corretta' },
-          { status: 401 }
-        )
-      }
-    } catch (bcryptError) {
-      console.error('Errore bcrypt:', bcryptError)
+    // Per i clienti, verifica anche lo stato del client
+    if (user.ruolo === 'cliente' && user.client_stato !== 'attivo') {
       return NextResponse.json(
-        { error: 'Errore nella verifica della password' },
-        { status: 500 }
+        { error: 'Your business account is pending approval.' },
+        { status: 403 }
       )
     }
 
-    // Login riuscito
-    const sessionToken = crypto.randomUUID()
-    
-    const cookieStore = await cookies()
-    await cookieStore.set('session', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-    })
-
-    await cookieStore.set('ruolo', user.ruolo || 'user', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-    })
-
-    return NextResponse.json({
-      success: true,
+    // Se arriviamo qui, l'utente è autenticato e attivo
+    const response = NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         ruolo: user.ruolo
-      }
+      },
+      redirectUrl: user.ruolo === 'admin' ? '/dashboard' : '/vetrina'
     })
 
+    // Imposta i cookie
+    response.cookies.set('session', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/'
+    })
+
+    response.cookies.set('user_role', user.ruolo, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/'
+    })
+
+    if (user.ruolo === 'cliente' && user.client_id) {
+      response.cookies.set('client_id', user.client_id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+      })
+    }
+
+    return response
+
   } catch (error) {
-    console.error('Errore completo:', error)
+    console.error('Login error:', error)
     return NextResponse.json(
-      { error: 'Errore durante il login' },
+      { error: 'An error occurred during login' },
       { status: 500 }
     )
   }

@@ -26,14 +26,11 @@ async function checkDuplicateName(normalizedName: string, excludeId?: string): P
 
 export async function GET() {
   try {
-    const result = await db.query(
-      'SELECT * FROM brands ORDER BY name ASC'
-    )
-    return NextResponse.json(result.rows)
+    const brands = await db.query('SELECT * FROM brands ORDER BY name')
+    return NextResponse.json({ data: brands.rows })
   } catch (error) {
-    console.error('Errore nel recupero dei brands:', error)
     return NextResponse.json(
-      { error: 'Errore nel recupero dei brands' },
+      { error: 'Errore nel recupero dei brand' },
       { status: 500 }
     )
   }

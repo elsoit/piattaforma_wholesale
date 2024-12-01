@@ -6,7 +6,9 @@ const adminRoutes = [
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/dashboard/users', label: 'Utenti' },
   { path: '/dashboard/clients', label: 'Clienti' },
-  { path: '/dashboard/orders', label: 'Ordini' },
+  { path: '/dashboard/parametri', label: 'Parametri' },
+  { path: '/dashboard/cataloghi', label: 'Cataloghi' },
+
 ]
 
 export default async function DashboardLayout({
@@ -18,7 +20,6 @@ export default async function DashboardLayout({
   const ruolo = cookieStore.get('ruolo')?.value
 
   if (ruolo !== 'admin') {
-    redirect('/vetrina')
   }
 
   return (

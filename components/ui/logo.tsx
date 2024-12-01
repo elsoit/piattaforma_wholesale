@@ -1,14 +1,13 @@
+import { cn } from "@/lib/utils"
+
 interface LogoProps {
   className?: string
 }
 
 export function Logo({ className }: LogoProps) {
   return (
-    <div className={className}>
-      {/* Sostituisci con il tuo logo */}
-      <span className="text-2xl font-bold text-blue-600">
-        LOGO
-      </span>
+    <div className={cn("font-semibold text-lg", className)}>
+      Logo
     </div>
   )
 } 

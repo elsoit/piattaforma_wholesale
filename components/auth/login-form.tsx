@@ -4,6 +4,16 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+
+interface LoginResponse {
+  user: {
+    ruolo: string;
+  };
+  error?: string;
+}
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
@@ -31,19 +41,24 @@ export function LoginForm() {
         body: JSON.stringify(loginData)
       })
 
-      const data = await response.json()
+      const data = (await response.json()) as LoginResponse;
 
       if (!response.ok) {
         throw new Error(data.error || 'Errore durante il login')
       }
 
+      console.log('Login response:', data) // Debug log
+
+      // Aspetta che i cookie siano impostati
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Reindirizza in base al ruolo
       if (data.user.ruolo === 'admin') {
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       } else {
-        router.push('/vetrina')
+        window.location.href = '/vetrina'
       }
       
-      router.refresh()
     } catch (err) {
       console.error('Errore login:', err)
       setError(err instanceof Error ? err.message : 'Credenziali non valide')
@@ -53,107 +68,95 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-md p-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm mb-8">
-        <h2 className="text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
-          Accedi al tuo account
-        </h2>
-      </div>
-
+    <div className="w-full">
       {error && (
-        <div className="mb-6 p-3 text-sm text-red-500 bg-red-50 rounded-md">
+        <div className="mb-6 p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label 
+          <Label 
             htmlFor="email" 
-            className="block text-sm font-medium leading-6 text-gray-900"
+            className="font-medium text-gray-900"
           >
             Email
-          </label>
+          </Label>
           <div className="mt-2">
-            <input
+            <Input
               id="email"
               name="email"
               type="email"
               required
-              className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+              className="h-12 px-4 bg-white placeholder:text-muted-foreground/50"
               placeholder="nome@esempio.com"
             />
           </div>
         </div>
 
         <div>
-          <label 
+          <Label 
             htmlFor="password" 
-            className="block text-sm font-medium leading-6 text-gray-900"
+            className="font-medium text-gray-900"
           >
             Password
-          </label>
+          </Label>
           <div className="mt-2 relative">
-            <input
+            <Input
               id="password"
               name="password"
               type={showPassword ? "text" : "password"}
               required
-              className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+              className="h-12 px-4 bg-white placeholder:text-muted-foreground/50"
               placeholder="••••••••"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 flex items-center pr-3"
+              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
             >
               {showPassword ? 
-                <EyeOff className="h-5 w-5 text-gray-400" /> : 
-                <Eye className="h-5 w-5 text-gray-400" />
+                <EyeOff className="h-4 w-4 text-gray-400" /> : 
+                <Eye className="h-4 w-4 text-gray-400" />
               }
-            </button>
+            </Button>
           </div>
         </div>
 
         <div>
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
+            className="w-full h-12 bg-black hover:bg-black/90 text-white"
           >
             {loading ? 'Accesso in corso...' : 'Accedi'}
-          </button>
+          </Button>
         </div>
       </form>
 
-      <div className="mt-8">
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">oppure</span>
-          </div>
-        </div>
-
-        <div className="mt-6">
+      <div className="mt-6 text-center text-sm text-gray-500">
+        <p>
+          Don't have an account?{' '}
           <Link
             href="/register"
-            className="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-blue-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600"
+            className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
           >
-            Registra la tua azienda
+            Sign up here
           </Link>
-        </div>
+        </p>
       </div>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <div className="mt-4 text-center">
         <Link
           href="/forgot-password"
-          className="font-semibold text-blue-600 hover:text-blue-500"
+          className="text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
         >
-          Password dimenticata?
+          Forgot password?
         </Link>
-      </p>
+      </div>
     </div>
   )
 }
