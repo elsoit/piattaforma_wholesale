@@ -1,0 +1,5 @@
+.transition-margin {
+  transition-property: margin-right;
+  transition-duration: 450ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+} 
