@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import JSZip from 'jszip'
 import { db } from '@/lib/db'
-
-const BUCKET_NAME = 'piattaforma-whls'
-
-const R2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-  },
-  forcePathStyle: true,
-})
+import { downloadFileFromR2 } from '@/lib/r2-helpers'
 
 export async function GET(
   request: NextRequest,
@@ -53,19 +40,9 @@ export async function GET(
         const key = file.file_url.split('/').pop()
         if (!key) return false
 
-        const command = new GetObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: key,
-        })
+        const { buffer } = await downloadFileFromR2(key)
         
-        const signedUrl = await getSignedUrl(R2, command, { expiresIn: 300 })
-
-        const response = await fetch(signedUrl)
-        if (!response.ok) return false
-
-        const buffer = await response.arrayBuffer()
-        
-        zip.file(file.nome, new Uint8Array(buffer), {
+        zip.file(file.nome, buffer, {
           binary: true,
           compression: 'DEFLATE',
           compressionOptions: { level: 6 }
@@ -99,18 +76,10 @@ export async function GET(
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-_.]/g, '')
 
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new Uint8Array(zipContent))
-        controller.close()
-      },
-    })
-
-    return new NextResponse(stream, {
+    return new NextResponse(zipContent, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${zipFileName}"`,
-        'Transfer-Encoding': 'chunked'
       }
     })
 

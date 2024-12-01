@@ -1,7 +1,7 @@
-import { S3ClientConfig } from '@aws-sdk/client-s3'
+import { S3Client } from '@aws-sdk/client-s3'
 import { config } from '@/config/environment'
 
-export const r2Config: S3ClientConfig = {
+export const R2 = new S3Client({
   region: 'auto',
   endpoint: `https://${config.r2.accountId}.r2.cloudflarestorage.com`,
   credentials: {
@@ -9,10 +9,6 @@ export const r2Config: S3ClientConfig = {
     secretAccessKey: config.r2.secretAccessKey,
   },
   forcePathStyle: true,
-}
+})
 
-export const BUCKET_NAME = config.r2.bucket
-
-export const getR2PublicUrl = (key: string): string => {
-  return `${config.r2.publicUrl}/${key}`
-} 
+export const BUCKET_NAME = config.r2.bucket 
