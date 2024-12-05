@@ -49,8 +49,11 @@ function DesktopRegister() {
         <div className="h-full w-full">
           <video 
             src="https://cdn.dribbble.com/uploads/48226/original/b8bd4e4273cceae2889d9d259b04f732.mp4?1689028949"
-            alt="Authentication illustration"
             className="h-full w-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
           />
         </div>
       </div>

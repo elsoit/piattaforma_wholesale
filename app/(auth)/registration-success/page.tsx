@@ -34,13 +34,18 @@ function DesktopSuccess() {
             
             <div className="mt-4 text-gray-600 space-y-4">
               <p>
-                Thank you for registering. Our team will verify your information 
-                and activate your account as soon as possible.
+                Thank you for registering. Please check your email to verify your account.
               </p>
               
               <p>
-                You will receive a confirmation email when your account is active.
-                You can then log in using the credentials you provided during registration.
+                After verifying your email, our team will review your information 
+                and activate your account. You'll receive another email when your 
+                account is active.
+              </p>
+
+              <p className="text-sm bg-yellow-50 p-4 rounded-md border border-yellow-200">
+                Important: Please check your spam folder if you don't see the verification 
+                email in your inbox.
               </p>
             </div>
 
@@ -85,13 +90,18 @@ function MobileSuccess() {
         
         <div className="mt-4 text-gray-600 space-y-4">
           <p>
-            Thank you for registering. Our team will verify your information 
-            and activate your account as soon as possible.
+            Thank you for registering. Please check your email to verify your account.
           </p>
           
           <p>
-            You will receive a confirmation email when your account is active.
-            You can then log in using the credentials you provided during registration.
+            After verifying your email, our team will review your information 
+            and activate your account. You'll receive another email when your 
+            account is active.
+          </p>
+
+          <p className="text-sm bg-yellow-50 p-4 rounded-md border border-yellow-200">
+            Important: Please check your spam folder if you don't see the verification 
+            email in your inbox.
           </p>
         </div>
 

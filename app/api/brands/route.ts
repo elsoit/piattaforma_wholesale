@@ -1,141 +1,161 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { createBrandSchema, updateBrandSchema } from '@/types/api-requests'
+import { createErrorResponse, createSuccessResponse } from '@/types/api'
 import { v4 as uuidv4 } from 'uuid'
 
-// Funzione di utilità per normalizzare il nome
-function normalizeName(name: string): string {
-  return name.trim().toUpperCase()
-}
-
-// Funzione per verificare duplicati
-async function checkDuplicateName(normalizedName: string, excludeId?: string): Promise<boolean> {
+// GET: Recupera tutti i brand
+export async function GET(request: Request) {
   try {
-    const query = excludeId
-      ? 'SELECT id FROM brands WHERE UPPER(TRIM(name)) = $1 AND id != $2'
-      : 'SELECT id FROM brands WHERE UPPER(TRIM(name)) = $1'
-    
-    const params = excludeId ? [normalizedName, excludeId] : [normalizedName]
-    
-    const { rows } = await db.query(query, params)
-    return rows.length > 0
-  } catch (error) {
-    console.error('Errore nel controllo duplicati:', error)
-    throw error
-  }
-}
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const search = searchParams.get('search')
+    const offset = (page - 1) * limit
 
-export async function GET() {
-  try {
-    const brands = await db.query('SELECT * FROM brands ORDER BY name')
-    return NextResponse.json({ data: brands.rows })
+    let query = 'SELECT * FROM brands'
+    const params: any[] = []
+
+    if (search) {
+      query += ' WHERE name ILIKE $1'
+      params.push(`%${search}%`)
+    }
+
+    // Conta totale
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM (${query}) as count`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].count)
+
+    // Query paginata
+    query += ' ORDER BY name ASC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
+    params.push(limit, offset)
+
+    const result = await db.query(query, params)
+
+    return NextResponse.json({
+      data: result.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    })
+
   } catch (error) {
+    console.error('Errore nel recupero dei brand:', error)
     return NextResponse.json(
-      { error: 'Errore nel recupero dei brand' },
+      createErrorResponse('Errore nel recupero dei brand'),
       { status: 500 }
     )
   }
 }
 
+// POST: Crea un nuovo brand
 export async function POST(request: Request) {
   try {
-    const data = await request.json()
-    const normalizedName = normalizeName(data.name)
-    
+    const body = await request.json()
+    const data = createBrandSchema.parse(body)
+
     // Verifica duplicati
-    const isDuplicate = await checkDuplicateName(normalizedName)
-    if (isDuplicate) {
+    const existing = await db.query(
+      'SELECT id FROM brands WHERE LOWER(name) = LOWER($1)',
+      [data.name]
+    )
+
+    if (existing.rows.length > 0) {
       return NextResponse.json(
-        { error: 'Esiste già un brand con questo nome' },
+        createErrorResponse('Brand già esistente'),
         { status: 400 }
       )
     }
 
     const id = uuidv4()
-    const { rows } = await db.query(
-      `INSERT INTO brands (id, name, description, logo) 
-       VALUES ($1, $2, $3, $4) 
+    const result = await db.query(
+      `INSERT INTO brands (id, name, description, logo)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [id, normalizedName, data.description, data.logo]
+      [id, data.name, data.description, data.logo]
     )
 
-    return NextResponse.json(rows[0])
+    return NextResponse.json(
+      createSuccessResponse(result.rows[0]),
+      { status: 201 }
+    )
+
   } catch (error) {
     console.error('Errore nella creazione del brand:', error)
     return NextResponse.json(
-      { error: 'Errore nella creazione del brand' },
+      createErrorResponse('Errore nella creazione del brand'),
       { status: 500 }
     )
   }
 }
 
+// PUT: Aggiorna un brand esistente
 export async function PUT(request: Request) {
   try {
-    const data = await request.json()
-    const normalizedName = normalizeName(data.name)
-    
-    // Verifica duplicati escludendo il brand corrente
-    const isDuplicate = await checkDuplicateName(normalizedName, data.id)
-    if (isDuplicate) {
+    const body = await request.json()
+    const data = updateBrandSchema.parse(body)
+
+    if (!data.id) {
       return NextResponse.json(
-        { error: 'Esiste già un brand con questo nome' },
+        createErrorResponse('ID brand mancante'),
         { status: 400 }
       )
     }
+
+    // Verifica duplicati escludendo il brand corrente
+    if (data.name) {
+      const existing = await db.query(
+        'SELECT id FROM brands WHERE LOWER(name) = LOWER($1) AND id != $2',
+        [data.name, data.id]
+      )
+
+      if (existing.rows.length > 0) {
+        return NextResponse.json(
+          createErrorResponse('Brand già esistente'),
+          { status: 400 }
+        )
+      }
+    }
+
+    const { id, ...updateData } = data
+    const fields = Object.keys(updateData)
     
-    const { rows } = await db.query(
+    if (fields.length === 0) {
+      return NextResponse.json(
+        createErrorResponse('Nessun dato da aggiornare'),
+        { status: 400 }
+      )
+    }
+
+    const setClause = fields.map((field, i) => `${field} = $${i + 2}`).join(', ')
+    const values = fields.map(field => updateData[field as keyof typeof updateData])
+
+    const result = await db.query(
       `UPDATE brands 
-       SET name = $1, description = $2, logo = $3, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $4 
+       SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1 
        RETURNING *`,
-      [normalizedName, data.description, data.logo, data.id]
+      [id, ...values]
     )
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Brand non trovato' },
+        createErrorResponse('Brand non trovato'),
         { status: 404 }
       )
     }
 
-    return NextResponse.json(rows[0])
+    return NextResponse.json(
+      createSuccessResponse(result.rows[0])
+    )
+
   } catch (error) {
     console.error('Errore nell\'aggiornamento del brand:', error)
     return NextResponse.json(
-      { error: 'Errore nell\'aggiornamento del brand' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const url = new URL(request.url)
-    const id = url.pathname.split('/').pop()
-
-    if (!id) {
-      return NextResponse.json(
-        { error: 'ID non fornito' },
-        { status: 400 }
-      )
-    }
-
-    const { rows } = await db.query(
-      'DELETE FROM brands WHERE id = $1 RETURNING *',
-      [id]
-    )
-
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Brand non trovato' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Errore nella cancellazione del brand:', error)
-    return NextResponse.json(
-      { error: 'Errore nella cancellazione del brand' },
+      createErrorResponse('Errore nell\'aggiornamento del brand'),
       { status: 500 }
     )
   }

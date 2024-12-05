@@ -3,23 +3,23 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { LoginResponse } from '@/types/auth'
 
-interface LoginResponse {
-  user: {
-    ruolo: string;
-  };
-  error?: string;
+interface ApiResponse {
+  data?: {
+    user: LoginResponse['user']
+    redirectUrl: string
+  }
+  error?: string
 }
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -28,8 +28,8 @@ export function LoginForm() {
 
     const formData = new FormData(event.currentTarget)
     const loginData = {
-      email: formData.get('email')?.toString().toLowerCase(),
-      password: formData.get('password')?.toString()
+      email: formData.get('email')?.toString().toLowerCase() || '',
+      password: formData.get('password')?.toString() || ''
     }
 
     try {
@@ -38,30 +38,27 @@ export function LoginForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(loginData)
+        body: JSON.stringify(loginData),
+        credentials: 'include'
       })
 
-      const data = (await response.json()) as LoginResponse;
+      const data = await response.json() as ApiResponse
 
       if (!response.ok) {
-        throw new Error(data.error || 'Errore durante il login')
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        throw new Error('Errore durante il login')
       }
 
-      console.log('Login response:', data) // Debug log
-
-      // Aspetta che i cookie siano impostati
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Reindirizza in base al ruolo
-      if (data.user.ruolo === 'admin') {
-        window.location.href = '/dashboard'
-      } else {
-        window.location.href = '/vetrina'
+      if (!data.data?.redirectUrl) {
+        throw new Error('Risposta del server non valida')
       }
-      
+
+      window.location.href = data.data.redirectUrl
+
     } catch (err) {
-      console.error('Errore login:', err)
-      setError(err instanceof Error ? err.message : 'Credenziali non valide')
+      setError(err instanceof Error ? err.message : 'Errore durante il login')
     } finally {
       setLoading(false)
     }

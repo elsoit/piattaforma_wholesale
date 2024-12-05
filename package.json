@@ -9,10 +9,7 @@
     "build:prod": "npm run clean && NODE_ENV=production next build",
     "start:test": "NODE_ENV=test next start -p 3001",
     "start:prod": "NODE_ENV=production next start -p 3000",
-    "lint": "next lint",
-    "db:init": "ts-node scripts/init-db.ts",
-    "setup:test": "NODE_ENV=test npm run db:init",
-    "setup:prod": "NODE_ENV=production npm run db:init"
+    "lint": "next lint"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.701.0",
@@ -40,6 +37,7 @@
     "@tiptap/pm": "^2.10.3",
     "@tiptap/react": "^2.10.3",
     "@tiptap/starter-kit": "^2.10.3",
+    "@types/nodemailer": "^6.4.17",
     "@types/react-pdf": "^6.2.0",
     "@types/uuid": "^10.0.0",
     "@vercel/postgres": "^0.10.0",
@@ -57,6 +55,7 @@
     "lucide-react": "^0.460.0",
     "next": "15.0.3",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.16",
     "pdfjs-dist": "^3.4.120",
     "pg": "^8.13.1",
     "react": "19.0.0-rc-66855b96-20241106",

@@ -1,75 +1,76 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { createErrorResponse, createSuccessResponse } from '@/types/api'
 
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const clientId = params.id
-  console.log('Tentativo di attivazione cliente:', clientId)
-  
-  const dbClient = await db.connect()
-  
   try {
-    await dbClient.query('BEGIN')
+    const clientId = params.id
 
-    const { rows } = await dbClient.query(
-      'SELECT stato, user_id, company_name FROM clients WHERE id = $1',
-      [clientId]
-    )
+    // Inizia transazione
+    await db.query('BEGIN')
 
-    if (rows.length === 0) {
-      await dbClient.query('ROLLBACK')
-      return NextResponse.json({
-        success: false,
-        message: 'Cliente non trovato'
-      }, { status: 404 })
-    }
+    try {
+      // Verifica che l'email sia verificata
+      const result = await db.query(`
+        SELECT u.email_verified
+        FROM clients c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = $1
+      `, [clientId])
 
-    const { stato, user_id, company_name } = rows[0]
-    console.log('Stato attuale cliente:', stato)
-    
-    // Attiva l'utente se il cliente era in attesa o eliminato
-    if (stato === 'in_attesa_di_attivazione' || stato === 'eliminata') {
-      await dbClient.query(
-        'UPDATE users SET attivo = true WHERE id = $1',
-        [user_id]
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          createErrorResponse('Cliente non trovato'),
+          { status: 404 }
+        )
+      }
+
+      const { email_verified } = result.rows[0]
+
+      if (!email_verified) {
+        return NextResponse.json(
+          createErrorResponse('Non è possibile attivare il cliente: email non verificata'),
+          { status: 400 }
+        )
+      }
+
+      // Procedi con l'attivazione
+      await db.query(`
+        UPDATE clients 
+        SET stato = 'attivo',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *
+      `, [clientId])
+
+      // Attiva anche l'utente associato
+      await db.query(`
+        UPDATE users u
+        SET attivo = true
+        FROM clients c
+        WHERE c.user_id = u.id
+        AND c.id = $1
+      `, [clientId])
+
+      await db.query('COMMIT')
+
+      return NextResponse.json(
+        createSuccessResponse('Cliente attivato con successo')
       )
+
+    } catch (error) {
+      await db.query('ROLLBACK')
+      throw error
     }
-
-    // Attiva il cliente
-    await dbClient.query(
-      'UPDATE clients SET stato = $1 WHERE id = $2',
-      ['attivo', clientId]
-    )
-
-    await dbClient.query('COMMIT')
-
-    let message = ''
-    switch(stato) {
-      case 'in_attesa_di_attivazione':
-        message = `Cliente ${company_name} abilitato con successo`
-        break
-      case 'eliminata':
-        message = `Cliente ${company_name} riattivato con successo`
-        break
-      default:
-        message = `Cliente ${company_name} attivato con successo`
-    }
-
-    return NextResponse.json({
-      success: true,
-      message
-    })
 
   } catch (error) {
-    await dbClient.query('ROLLBACK')
-    console.error('Errore durante l\'attivazione:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Errore durante l\'attivazione del cliente'
-    }, { status: 500 })
-  } finally {
-    dbClient.release()
+    console.error('Errore nell\'attivazione del cliente:', error)
+    return NextResponse.json(
+      createErrorResponse('Errore durante l\'attivazione del cliente'),
+      { status: 500 }
+    )
   }
 } 

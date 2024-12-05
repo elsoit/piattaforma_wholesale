@@ -35,10 +35,8 @@ interface ExcelData {
 }
 
 interface PreviewResponse {
-  success: boolean;
-  previewUrl: string;
-  expiresIn: number;
-  filename: string;
+  success: boolean
+  previewUrl: string | null
 }
 
 export function CatalogoFiles({ catalogoId, hasNotesOrConditions = false }: CatalogoFilesProps) {
@@ -231,7 +229,7 @@ export function CatalogoFiles({ catalogoId, hasNotesOrConditions = false }: Cata
       
       if (!response.ok) throw new Error('Errore nel recupero dell\'anteprima')
       
-      const data = await response.json()
+      const data = await response.json() as PreviewResponse
       return data.previewUrl || null
     } catch (err) {
       console.error('Errore nel recupero dell\'anteprima:', err)

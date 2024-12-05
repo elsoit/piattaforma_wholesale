@@ -1,21 +1,9 @@
 // layout.tsx (Server Component)
-import type { Metadata } from "next"
-import localFont from "next/font/local"
-import "./globals.css"
-import '@/styles/phone-input.css'
-import { Toaster } from "sonner"
+import { Inter } from 'next/font/google'
+import './globals.css'
+import { TransitionWrapper } from '@/components/layout/transition-wrapper'
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-})
-
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-})
+const inter = Inter({ subsets: ['latin'] })
 
 export default function RootLayout({
   children,
@@ -23,11 +11,24 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen bg-background font-sans antialiased">
-        {children}
-        <Toaster />
+    <html lang="en">
+      <head>
+        <script
+          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+          async
+          defer
+        />
+      </head>
+      <body>
+        <TransitionWrapper>
+          {children}
+        </TransitionWrapper>
       </body>
     </html>
   )
+}
+
+export const metadata = {
+  title: 'Piattaforma Wholesale',
+  description: 'Piattaforma per la gestione dei cataloghi wholesale',
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { createClientSchema, updateClientSchema } from '@/types/api-requests'
+import { createErrorResponse } from '@/types/api'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,22 +12,44 @@ export async function GET() {
     const result = await db.query(`
       SELECT 
         c.*,
-        json_build_object(
-          'id', u.id,
-          'nome', u.nome,
-          'cognome', u.cognome,
-          'email', u.email,
-          'attivo', u.attivo
-        ) as user
+        u.id as user_id,
+        u.nome,
+        u.cognome,
+        u.email,
+        u.attivo
       FROM clients c
-      INNER JOIN users u ON c.user_id = u.id
-      ORDER BY c.company_name ASC
+      LEFT JOIN users u ON c.user_id = u.id
+      ORDER BY c.created_at DESC
     `)
 
-    // Log per debug
-    console.log('Clients query result:', result.rows)
+    // Formatta i risultati per includere i dati dell'utente nidificati
+    const clients = result.rows.map(row => ({
+      id: row.id,
+      codice: row.codice,
+      company_name: row.company_name,
+      vat_number: row.vat_number,
+      business: row.business,
+      country: row.country,
+      city: row.city,
+      address: row.address,
+      zip_code: row.zip_code,
+      company_email: row.company_email,
+      company_phone: row.company_phone,
+      pec: row.pec,
+      sdi: row.sdi,
+      stato: row.stato,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      user: row.user_id ? {
+        id: row.user_id,
+        nome: row.nome,
+        cognome: row.cognome,
+        email: row.email,
+        attivo: row.attivo
+      } : null
+    }))
 
-    return NextResponse.json(result.rows)
+    return NextResponse.json(clients)
   } catch (error) {
     console.error('Errore nel recupero dei clienti:', error)
     return NextResponse.json(
@@ -39,6 +63,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    const validatedData = createClientSchema.parse(body)
+    
     const { 
       company_name,
       vat_number,
@@ -54,7 +80,7 @@ export async function POST(request: Request) {
       user_id,
       stato = 'inattivo',
       attivo = true
-    } = body
+    } = validatedData
 
     // Verifica se esiste già una partita IVA uguale
     const existingVat = await db.query(
@@ -145,7 +171,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
-    const { id, stato, attivo } = body
+    const validatedData = updateClientSchema.parse(body)
+    const { id, stato, attivo } = validatedData
 
     const result = await db.query(
       `UPDATE clients 

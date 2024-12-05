@@ -87,7 +87,7 @@ export default function ClientsPage() {
     }
   }
 
-  const handleSave = async (updatedClient: Client & { created_at?: string }) => {
+  const handleSave = async (updatedClient: Client) => {
     try {
       const response = await fetch(`/api/clients/${updatedClient.id}`, {
         method: 'PATCH',
@@ -99,49 +99,48 @@ export default function ClientsPage() {
         throw new Error('Errore nel salvataggio del cliente')
       }
 
-      const updatedData = await response.json()
+      const { data: savedClient } = await response.json() as { data: Client }
       
-      // Aggiorna sia la lista dei clienti che il cliente selezionato
+      // Aggiorna la lista dei clienti mantenendo tutti i dati
       setClients(prevClients =>
         prevClients.map(client =>
-          client.id === updatedClient.id ? updatedData.data : client
+          client.id === savedClient.id ? savedClient : client
         )
       )
-      setSelectedClient(updatedData.data) // Aggiorna il cliente selezionato
 
+      // Aggiorna anche il cliente selezionato
+      setSelectedClient(savedClient)
       toast.success('Cliente aggiornato con successo')
     } catch (error) {
       console.error('Errore nel salvataggio del cliente:', error)
       toast.error('Errore nel salvataggio del cliente')
-      // Ricarica i dati in caso di errore
-      await fetchClients()
+      await fetchClients() // Ricarica i dati in caso di errore
     }
   }
 
   const handleActivateClient = async (clientId: string) => {
     try {
-      console.log('Inizio attivazione cliente:', clientId)
-      
       const response = await fetch(`/api/clients/${clientId}/activate`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       })
 
-      const data = await response.json()
-      console.log('Risposta dal server:', data)
+      const { data: updatedClient } = await response.json() as { data: Client }
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Errore durante l\'attivazione')
-      }
+      // Aggiorna la lista dei clienti con il client aggiornato
+      setClients(prevClients =>
+        prevClients.map(client =>
+          client.id === updatedClient.id ? updatedClient : client
+        )
+      )
 
-      toast.success(data.message)
-      await fetchClients()
-
+      // Aggiorna anche il cliente selezionato
+      setSelectedClient(updatedClient)
+      toast.success('Cliente attivato con successo')
     } catch (error) {
       console.error('Errore durante l\'attivazione:', error)
       toast.error('Errore durante l\'attivazione del cliente')
+      await fetchClients()
     }
   }
 

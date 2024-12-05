@@ -1,18 +1,13 @@
-import { S3ClientConfig } from '@aws-sdk/client-s3'
-import { config } from '@/config/environment'
+import { S3Client } from '@aws-sdk/client-s3';
 
-export const r2Config: S3ClientConfig = {
+export const r2Client = new S3Client({
   region: 'auto',
-  endpoint: `https://${config.r2.accountId}.r2.cloudflarestorage.com`,
+  endpoint: 'https://a8e3ac15a95a1b6a6bd0e51aadb0d9b6.r2.cloudflarestorage.com',
   credentials: {
-    accessKeyId: config.r2.accessKeyId,
-    secretAccessKey: config.r2.secretAccessKey,
-  },
-  forcePathStyle: true,
-}
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  }
+});
 
-export const BUCKET_NAME = config.r2.bucket
-
-export const getR2PublicUrl = (key: string): string => {
-  return `${config.r2.publicUrl}/${key}`
-} 
+export const R2_ENDPOINT = 'ancient-moon-a771.steep-firefly-f7f0.workers.dev';
+export const R2_BUCKET = 'piattaforma-whls'; 

@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcrypt'
+import { loginSchema } from '@/types/auth'
+import { createErrorResponse, createSuccessResponse } from '@/types/api'
 
-interface LoginRequest {
-  email: string;
-  password: string;
+interface UserRow {
+  id: number
+  email: string
+  password: string
+  ruolo: string
+  attivo: boolean
+  client_id: number | null
+  client_stato: string | null
 }
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = (await request.json()) as LoginRequest
+    const body = await request.json()
+    const validatedData = loginSchema.parse(body)
 
-    // Query modificata per includere il campo attivo
     const userQuery = `
       SELECT 
         u.id,
@@ -31,80 +38,75 @@ export async function POST(request: Request) {
       LEFT JOIN clients c ON u.id = c.user_id
       WHERE u.email = $1
     `
-    const { rows: [user] } = await db.query(userQuery, [email.toLowerCase()])
+    const { rows: [user] } = await db.query<UserRow>(userQuery, [validatedData.email.toLowerCase()])
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        createErrorResponse('Credenziali non valide'),
         { status: 401 }
       )
     }
 
-    // Verifica password
-    const validPassword = await bcrypt.compare(password, user.password)
+    const validPassword = await bcrypt.compare(validatedData.password, user.password)
     if (!validPassword) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        createErrorResponse('Credenziali non valide'),
         { status: 401 }
       )
     }
 
-    // Verifica se l'utente è attivo
     if (!user.attivo) {
       return NextResponse.json(
-        { error: 'Your account is not active yet. Please wait for activation.' },
+        createErrorResponse('Account non ancora attivo'),
         { status: 403 }
       )
     }
 
-    // Per i clienti, verifica anche lo stato del client
     if (user.ruolo === 'cliente' && user.client_stato !== 'attivo') {
       return NextResponse.json(
-        { error: 'Your business account is pending approval.' },
+        createErrorResponse('Account business in attesa di approvazione'),
         { status: 403 }
       )
     }
 
-    // Se arriviamo qui, l'utente è autenticato e attivo
-    const response = NextResponse.json({
+    const redirectUrl = user.ruolo === 'admin' 
+      ? '/dashboard'
+      : user.ruolo === 'cliente' 
+        ? '/vetrina'
+        : '/vetrina' // default per altri ruoli
+
+    const response = NextResponse.json(createSuccessResponse({
       user: {
         id: user.id,
         email: user.email,
-        ruolo: user.ruolo
+        ruolo: user.ruolo,
+        clientId: user.client_id
       },
-      redirectUrl: user.ruolo === 'admin' ? '/dashboard' : '/vetrina'
-    })
+      redirectUrl
+    }))
 
     // Imposta i cookie
-    response.cookies.set('session', user.id, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/'
-    })
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 60 * 60 * 24 // 24 ore
+    }
 
-    response.cookies.set('user_role', user.ruolo, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/'
-    })
-
-    if (user.ruolo === 'cliente' && user.client_id) {
-      response.cookies.set('client_id', user.client_id, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/'
-      })
+    response.cookies.set('session', user.id.toString(), cookieOptions)
+    response.cookies.set('user_role', user.ruolo, cookieOptions)
+    
+    if (user.client_id) {
+      response.cookies.set('client_id', user.client_id.toString(), cookieOptions)
     }
 
     return response
 
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Errore login:', error)
     return NextResponse.json(
-      { error: 'An error occurred during login' },
+      createErrorResponse('Errore durante il login'),
       { status: 500 }
     )
   }

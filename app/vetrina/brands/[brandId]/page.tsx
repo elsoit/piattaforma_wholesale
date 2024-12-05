@@ -162,37 +162,70 @@ function CatalogoCard({ catalogo }: { catalogo: Catalogo }) {
 
             {(catalogo.note || catalogo.condizioni) && (
               <div ref={accordionRef}>
-                <Accordion 
-                  type={isMobile ? "multiple" : "single"}
-                  collapsible="true"
-                  defaultValue={isMobile ? ["note", "condizioni"] : "note"}
-                  className="w-full mt-2"
-                >
-                  {catalogo.note && (
-                    <AccordionItem value="note">
-                      <AccordionTrigger className="text-sm">Note</AccordionTrigger>
-                      <AccordionContent>
-                        <div 
-                          ref={noteRef}
-                          className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${noteHeight}`}
-                          dangerouslySetInnerHTML={{ __html: catalogo.note }} 
-                        />
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
-                  {catalogo.condizioni && (
-                    <AccordionItem value="condizioni" className="border-b-0">
-                      <AccordionTrigger className="text-sm">Condizioni</AccordionTrigger>
-                      <AccordionContent>
-                        <div 
-                          ref={condizioniRef}
-                          className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${condizioniHeight}`}
-                          dangerouslySetInnerHTML={{ __html: catalogo.condizioni }} 
-                        />
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
-                </Accordion>
+                {isMobile ? (
+                  <Accordion 
+                    type="multiple"
+                    defaultValue={["note", "condizioni"]}
+                    className="w-full mt-2"
+                  >
+                    {catalogo.note && (
+                      <AccordionItem value="note">
+                        <AccordionTrigger className="text-sm">Note</AccordionTrigger>
+                        <AccordionContent>
+                          <div 
+                            ref={noteRef}
+                            className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${noteHeight}`}
+                            dangerouslySetInnerHTML={{ __html: catalogo.note }} 
+                          />
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                    {catalogo.condizioni && (
+                      <AccordionItem value="condizioni" className="border-b-0">
+                        <AccordionTrigger className="text-sm">Condizioni</AccordionTrigger>
+                        <AccordionContent>
+                          <div 
+                            ref={condizioniRef}
+                            className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${condizioniHeight}`}
+                            dangerouslySetInnerHTML={{ __html: catalogo.condizioni }} 
+                          />
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                  </Accordion>
+                ) : (
+                  <Accordion 
+                    type="single"
+                    collapsible={true}
+                    defaultValue="note"
+                    className="w-full mt-2"
+                  >
+                    {catalogo.note && (
+                      <AccordionItem value="note">
+                        <AccordionTrigger className="text-sm">Note</AccordionTrigger>
+                        <AccordionContent>
+                          <div 
+                            ref={noteRef}
+                            className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${noteHeight}`}
+                            dangerouslySetInnerHTML={{ __html: catalogo.note }} 
+                          />
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                    {catalogo.condizioni && (
+                      <AccordionItem value="condizioni" className="border-b-0">
+                        <AccordionTrigger className="text-sm">Condizioni</AccordionTrigger>
+                        <AccordionContent>
+                          <div 
+                            ref={condizioniRef}
+                            className={`text-sm prose prose-sm max-w-none overflow-y-auto pr-2 ${condizioniHeight}`}
+                            dangerouslySetInnerHTML={{ __html: catalogo.condizioni }} 
+                          />
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                  </Accordion>
+                )}
               </div>
             )}
           </div>
@@ -235,8 +268,8 @@ export default function BrandPage() {
         
         console.log('Cataloghi ricevuti:', cataloghiData)
 
-        setBrand(brandData)
-        setCataloghi(cataloghiData)
+        setBrand(brandData as Brand)
+        setCataloghi(cataloghiData as Catalogo[])
       } catch (err) {
         console.error('Errore:', err)
         setError(err instanceof Error ? err.message : 'Errore sconosciuto')

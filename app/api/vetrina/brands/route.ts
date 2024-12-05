@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { getClientId } from '@/lib/auth'
+import { z } from 'zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,16 +60,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const clientId = await getClientId()
-    
-    if (!clientId) {
-      return NextResponse.json(
-        { error: 'Non autorizzato' },
-        { status: 401 }
-      )
-    }
+    if (!clientId) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
-    const data = await request.json()
-    const brandIds = Array.isArray(data.brandIds) ? data.brandIds : []
+    const validatedData = z.object({
+      brandIds: z.array(z.string())
+    }).parse(await request.json())
+
+    const { brandIds } = validatedData
 
     // Inizia una transazione
     await db.query('BEGIN')
