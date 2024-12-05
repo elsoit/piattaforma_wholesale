@@ -27,6 +27,7 @@ interface RegisterRequest {
     pec?: string
     sdi?: string
     province: string
+    region: string
     acceptPrivacy: boolean
     acceptNewsletter: boolean
   }
@@ -53,12 +54,23 @@ function validateVatNumber(vatNumber: string, country: string): boolean {
   return vatRules[country].test(vatNumber)
 }
 
+// Aggiungi la regex per la validazione PEC
+const pecRegex = /^[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)*pec(?:\.it|\.ad|\.ch)$/;
+
 export async function POST(request: Request) {
   const dbClient = await db.connect()
 
   try {
     const body = await request.json() as RegisterRequest
     const { user, client: companyData } = body
+
+    // Validazione PEC se presente
+    if (companyData.pec && !pecRegex.test(companyData.pec)) {
+      return NextResponse.json(
+        { error: 'Formato PEC non valido' },
+        { status: 400 }
+      )
+    }
 
     // 1. Validazione della partita IVA in base al paese
     if (!validateVatNumber(companyData.vat_number, companyData.country)) {
@@ -142,13 +154,13 @@ export async function POST(request: Request) {
       const { rows: [newClient] } = await dbClient.query(`
         INSERT INTO clients (
           user_id, company_name, vat_number, business, 
-          country, address, city, zip_code, province,
+          country, address, city, zip_code, province, region,
           company_email, company_phone, pec, sdi,
           privacy_accepted, newsletter_subscribed,
           stato
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, 
-          $10, $11, $12, $13, $14, $15,
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+          $11, $12, $13, $14, $15, $16,
           'in_attesa_di_attivazione'
         )
         RETURNING *
@@ -162,6 +174,7 @@ export async function POST(request: Request) {
         companyData.city?.trim() || '',
         companyData.zip_code?.trim() || '',
         companyData.province?.trim() || '',
+        companyData.region?.trim() || '',
         companyData.company_email.toLowerCase().trim(),
         companyData.company_phone.trim(),
         companyData.pec?.toLowerCase().trim() || null,

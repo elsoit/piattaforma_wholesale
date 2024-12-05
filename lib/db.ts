@@ -1,7 +1,9 @@
 import { Pool } from 'pg';
+import { sql as postgresSQL } from '@vercel/postgres';
 
 export const runtime = 'nodejs';
 
+// Pool per connessioni dirette
 export const db = new Pool({
   user: 'postgres',
   host: 'localhost',
@@ -9,6 +11,9 @@ export const db = new Pool({
   password: '123456',
   port: parseInt('5432'),
 });
+
+// SQL helper per query parametrizzate
+export const sql = postgresSQL;
 
 // Funzione di test della connessione
 export async function testConnection() {

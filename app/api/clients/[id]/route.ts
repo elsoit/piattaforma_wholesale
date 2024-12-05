@@ -59,8 +59,10 @@ export async function PATCH(
            company_phone = $9,
            pec = $10,
            sdi = $11,
+           province = $12,
+           region = $13,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $12
+       WHERE id = $14
        RETURNING *`,
       [
         data.company_name,
@@ -74,6 +76,8 @@ export async function PATCH(
         data.company_phone,
         data.pec?.toLowerCase() || null,
         data.sdi?.toUpperCase() || null,
+        data.province,
+        data.region,
         id
       ]
     )

@@ -1,36 +1,38 @@
 .PhoneInput {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 !important;
-  border: 1px solid hsl(var(--input));
-  border-radius: 0.5rem;
-  background-color: hsl(var(--background));
+  display: flex !important;
+  height: 48px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  background-color: white !important;
 }
 
 .PhoneInputCountry {
-  display: flex;
-  align-items: center;
-  gap: 0 !important;
-  padding: 0 !important;
-  padding-left: 0.75rem !important;
-  min-width: 60px;
+  height: 48px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-right: 1px solid #e2e8f0 !important;
 }
 
 .PhoneInputCountrySelect {
-  padding-right: 0.5rem !important;
+  opacity: 0 !important;
+  position: absolute !important;
 }
 
-.PhoneInputCountryIcon {
-  margin-right: 0.25rem !important;
+.PhoneInputCountrySelectArrow {
+  display: none !important;
 }
 
 .PhoneInputInput {
-  flex: 1;
-  padding: 0 1rem !important;
+  height: 48px !important;
+  flex: 1 !important;
   border: none !important;
-  background: none !important;
+  background: transparent !important;
+  padding-left: 12px !important;
   outline: none !important;
+  box-shadow: none !important;
 }
 
 .PhoneInputInput::placeholder {

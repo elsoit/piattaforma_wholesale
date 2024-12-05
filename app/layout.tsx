@@ -1,9 +1,14 @@
-// layout.tsx (Server Component)
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { TransitionWrapper } from '@/components/layout/transition-wrapper'
+import Script from 'next/script'
+import { ClientProviders } from '@/components/client-providers'
 
 const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: 'Piattaforma Wholesale',
+  description: 'Piattaforma per la gestione dei cataloghi wholesale',
+}
 
 export default function RootLayout({
   children,
@@ -11,24 +16,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <script
+        <Script
           src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-          async
-          defer
+          strategy="lazyOnload"
         />
       </head>
-      <body>
-        <TransitionWrapper>
+      <body suppressHydrationWarning className={inter.className}>
+        <ClientProviders>
           {children}
-        </TransitionWrapper>
+        </ClientProviders>
       </body>
     </html>
   )
-}
-
-export const metadata = {
-  title: 'Piattaforma Wholesale',
-  description: 'Piattaforma per la gestione dei cataloghi wholesale',
 }

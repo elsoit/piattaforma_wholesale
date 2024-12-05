@@ -1,76 +1,99 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createErrorResponse, createSuccessResponse } from '@/types/api'
+import { sendEmail } from '@/lib/email'
+import { firstActivationTemplate } from '@/lib/email-templates/first-activation'
+
+interface ActivateRequest {
+  isFirstActivation: boolean
+}
 
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const clientId = await params.id
+  const { isFirstActivation } = await request.json() as ActivateRequest
+  const dbClient = await db.connect()
+  
   try {
-    const clientId = params.id
+    await dbClient.query('BEGIN')
 
-    // Inizia transazione
-    await db.query('BEGIN')
+    // Recupera i dati del cliente e dell'utente
+    const { rows: [client] } = await dbClient.query(`
+      SELECT 
+        c.*,
+        u.nome,
+        u.email as user_email,
+        u.id as user_id,
+        c.company_name
+      FROM clients c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.id = $1
+    `, [clientId])
 
-    try {
-      // Verifica che l'email sia verificata
-      const result = await db.query(`
-        SELECT u.email_verified
-        FROM clients c
-        JOIN users u ON u.id = c.user_id
-        WHERE c.id = $1
-      `, [clientId])
-
-      if (result.rows.length === 0) {
-        return NextResponse.json(
-          createErrorResponse('Cliente non trovato'),
-          { status: 404 }
-        )
-      }
-
-      const { email_verified } = result.rows[0]
-
-      if (!email_verified) {
-        return NextResponse.json(
-          createErrorResponse('Non è possibile attivare il cliente: email non verificata'),
-          { status: 400 }
-        )
-      }
-
-      // Procedi con l'attivazione
-      await db.query(`
-        UPDATE clients 
-        SET stato = 'attivo',
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-        RETURNING *
-      `, [clientId])
-
-      // Attiva anche l'utente associato
-      await db.query(`
-        UPDATE users u
-        SET attivo = true
-        FROM clients c
-        WHERE c.user_id = u.id
-        AND c.id = $1
-      `, [clientId])
-
-      await db.query('COMMIT')
-
-      return NextResponse.json(
-        createSuccessResponse('Cliente attivato con successo')
-      )
-
-    } catch (error) {
-      await db.query('ROLLBACK')
-      throw error
+    if (!client) {
+      throw new Error('Cliente non trovato')
     }
 
-  } catch (error) {
-    console.error('Errore nell\'attivazione del cliente:', error)
-    return NextResponse.json(
-      createErrorResponse('Errore durante l\'attivazione del cliente'),
-      { status: 500 }
+    // Attiva il cliente
+    await dbClient.query(
+      'UPDATE clients SET stato = $1 WHERE id = $2',
+      ['attivo', clientId]
     )
+
+    // Se è la prima attivazione, attiva anche l'utente e invia l'email
+    if (isFirstActivation) {
+      await dbClient.query(
+        'UPDATE users SET attivo = true WHERE id = $1',
+        [client.user_id]
+      )
+
+      console.log('📧 [ACTIVATION] Tentativo di invio email di attivazione:', {
+        userId: client.user_id,
+        userEmail: client.user_email,
+        companyName: client.company_name
+      })
+
+      try {
+        // Invia l'email di prima attivazione all'email dell'utente
+        await sendEmail({
+          to: client.user_email,
+          subject: 'Account Attivato con Successo',
+          template: 'first-activation',
+          data: {
+            nome: client.nome,
+            company_name: client.company_name,
+            email: client.user_email
+          }
+        })
+
+        console.log('✅ [ACTIVATION] Email di attivazione inviata con successo')
+
+      } catch (emailError) {
+        console.error('❌ [ACTIVATION] Errore nell\'invio dell\'email di attivazione:', {
+          error: emailError instanceof Error ? emailError.message : 'Errore sconosciuto',
+          userId: client.user_id,
+          userEmail: client.user_email
+        })
+      }
+    }
+
+    await dbClient.query('COMMIT')
+
+    return NextResponse.json({
+      success: true,
+      message: 'Cliente attivato con successo'
+    })
+
+  } catch (error) {
+    await dbClient.query('ROLLBACK')
+    console.error('Errore dettagliato:', error)
+    return NextResponse.json({
+      success: false,
+      message: 'Errore durante l\'attivazione del cliente',
+      error: error instanceof Error ? error.message : 'Errore sconosciuto'
+    }, { status: 500 })
+  } finally {
+    dbClient.release()
   }
 } 

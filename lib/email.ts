@@ -1,137 +1,124 @@
-import { createTransport } from 'nodemailer'
+import nodemailer from 'nodemailer'
+import { accountActivatedTemplate } from './email-templates/account-activated'
+import { firstActivationTemplate } from './email-templates/first-activation'
+import { brandActivatedTemplate } from './email-templates/brand-activated'
+import { verifyEmailTemplate } from './email-templates/verify-email'
 
-const transporter = createTransport({
+// Configura il trasporto SMTP
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
+  },
+  tls: {
+    rejectUnauthorized: true
   }
 })
 
-export async function sendVerificationEmail(
-  email: string,
-  name: string,
-  token: string
-) {
+// Verifica la connessione all'avvio
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('❌ [EMAIL] Errore nella configurazione SMTP:', error);
+  } else {
+    console.log('✅ [EMAIL] Server SMTP pronto per l\'invio');
+  }
+});
+
+type EmailTemplate = 'account-activated' | 'first-activation' | 'brand-activated' | 'verify-email'
+
+interface SendEmailProps {
+  to: string
+  subject: string
+  template: EmailTemplate
+  data: any
+}
+
+export async function sendEmail({ to, subject, template, data }: SendEmailProps) {
+  try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('📧 [EMAIL] Configurazione SMTP mancante:', {
+        to,
+        subject,
+        template
+      })
+      return
+    }
+
+    let htmlContent = ''
+    let textContent = ''
+
+    switch (template) {
+      case 'account-activated':
+        const activatedTemplate = accountActivatedTemplate(data)
+        htmlContent = activatedTemplate.html
+        textContent = activatedTemplate.text
+        break
+      case 'first-activation':
+        const firstActivationTemp = firstActivationTemplate(data)
+        htmlContent = firstActivationTemp.html
+        textContent = firstActivationTemp.text
+        break
+      case 'brand-activated':
+        const brandActivatedTemp = brandActivatedTemplate(data)
+        htmlContent = brandActivatedTemp.html
+        textContent = brandActivatedTemp.text
+        break
+      case 'verify-email':
+        const verifyEmailTemp = verifyEmailTemplate(data)
+        htmlContent = verifyEmailTemp.html
+        textContent = verifyEmailTemp.text
+        break
+      default:
+        throw new Error('Template non valido')
+    }
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM,
+      to,
+      subject,
+      html: htmlContent,
+      text: textContent
+    }
+
+    console.log('📧 [EMAIL] Tentativo di invio email:', {
+      to,
+      subject,
+      template,
+      data
+    })
+
+    await transporter.sendMail(mailOptions)
+    
+    console.log('✅ [EMAIL] Email inviata con successo:', {
+      to,
+      subject,
+      template
+    })
+
+  } catch (error) {
+    console.error('❌ [EMAIL] Errore nell\'invio dell\'email:', error)
+    console.warn('❌ [EMAIL] Dettagli email non inviata:', { 
+      to, 
+      subject, 
+      template,
+      error: error instanceof Error ? error.message : 'Errore sconosciuto'
+    })
+  }
+}
+
+export async function sendVerificationEmail(email: string, name: string, token: string) {
   const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email/${token}`
   
-  await transporter.sendMail({
-    from: `"${process.env.SMTP_FROM}" <${process.env.SMTP_USER}>`,
+  await sendEmail({
     to: email,
-    subject: 'Benvenuto in ARTEXMODA - Verifica il tuo account',
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Verifica Email</title>
-        </head>
-        <body style="
-          margin: 0;
-          padding: 0;
-          background-color: #f6f9fc;
-          font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        ">
-          <table width="100%" border="0" cellspacing="0" cellpadding="0">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table width="560" border="0" cellspacing="0" cellpadding="0" style="
-                  background-color: #ffffff;
-                  border-radius: 8px;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                ">
-                  <!-- Header -->
-                  <tr>
-                    <td align="center" style="padding: 40px 40px 0;">
-                      <img src="${process.env.NEXT_PUBLIC_APP_URL}/logo.png" alt="ARTEXMODA" style="width: 200px;">
-                    </td>
-                  </tr>
-                  
-                  <!-- Content -->
-                  <tr>
-                    <td style="padding: 40px;">
-                      <h1 style="
-                        margin: 0 0 20px;
-                        color: #1a1a1a;
-                        font-size: 24px;
-                        font-weight: 600;
-                        text-align: center;
-                      ">
-                        Benvenuto in ARTEXMODA!
-                      </h1>
-                      
-                      <p style="
-                        margin: 0 0 20px;
-                        color: #4a5568;
-                        font-size: 16px;
-                        line-height: 24px;
-                        text-align: center;
-                      ">
-                        Ciao ${name},<br>
-                        grazie per esserti registrato. Per iniziare ad utilizzare il tuo account, 
-                        verifica il tuo indirizzo email cliccando sul pulsante qui sotto.
-                      </p>
-                      
-                      <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td align="center" style="padding: 30px 0;">
-                            <a href="${verificationUrl}" style="
-                              display: inline-block;
-                              padding: 16px 36px;
-                              background-color: #000000;
-                              color: #ffffff;
-                              text-decoration: none;
-                              border-radius: 6px;
-                              font-size: 16px;
-                              font-weight: 600;
-                            ">
-                              Verifica Email
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-                      
-                      <p style="
-                        margin: 0;
-                        color: #718096;
-                        font-size: 14px;
-                        line-height: 20px;
-                        text-align: center;
-                      ">
-                        Se non hai richiesto questa email, puoi ignorarla in tutta sicurezza.
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="
-                      padding: 20px 40px;
-                      background-color: #f8fafc;
-                      border-bottom-left-radius: 8px;
-                      border-bottom-right-radius: 8px;
-                    ">
-                      <p style="
-                        margin: 0;
-                        color: #a0aec0;
-                        font-size: 12px;
-                        line-height: 18px;
-                        text-align: center;
-                      ">
-                        © ${new Date().getFullYear()} ARTEXMODA. Tutti i diritti riservati.<br>
-                        Questa è un'email automatica, per favore non rispondere.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `
+    subject: 'Verifica il tuo indirizzo email',
+    template: 'verify-email',
+    data: {
+      name,
+      verificationUrl
+    }
   })
 } 

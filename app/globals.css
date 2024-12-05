@@ -6,6 +6,22 @@
   .duration-450 {
     transition-duration: 450ms;
   }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background-color: #D1D5DB;
+    border-radius: 6px;
+  }
+  
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
 }
 
 body {

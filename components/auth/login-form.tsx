@@ -32,6 +32,13 @@ export function LoginForm() {
       password: formData.get('password')?.toString() || ''
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(loginData.email) || loginData.password.length < 8) {
+      setError('Credenziali non valide')
+      setLoading(false)
+      return
+    }
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -48,7 +55,7 @@ export function LoginForm() {
         if (data.error) {
           throw new Error(data.error)
         }
-        throw new Error('Errore durante il login')
+        throw new Error('Credenziali non valide')
       }
 
       if (!data.data?.redirectUrl) {
@@ -58,7 +65,7 @@ export function LoginForm() {
       window.location.href = data.data.redirectUrl
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore durante il login')
+      setError(err instanceof Error ? err.message : 'Credenziali non valide')
     } finally {
       setLoading(false)
     }

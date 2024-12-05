@@ -14,6 +14,7 @@ import { CountryCode, isValidPhoneNumber } from 'libphonenumber-js'
 import countries from 'i18n-iso-countries'
 import enLocale from 'i18n-iso-countries/langs/en.json'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
+import '@/styles/phone-input.css'
 
 type BusinessType = 
   | 'online_boutique' 
@@ -29,6 +30,8 @@ interface UserFormData {
   email: string
   telefono: string
   password: string
+  ruolo: 'cliente' | 'admin' | 'user'  // Specifica i ruoli possibili
+  attivo: boolean
 }
 
 interface CompanyFormData {
@@ -46,6 +49,7 @@ interface CompanyFormData {
   acceptPrivacy: boolean;
   acceptNewsletter: boolean;
   province: string;
+  region: string;  // Aggiunto il campo region
 }
 
 // Inizializza la libreria con la lingua inglese
@@ -195,8 +199,8 @@ interface ValidationErrors {
   cognome: string;
   email: string;
   password: string;
+  confirmPassword: string;
   telefono: string;
-  // Campi aziendali
   company_name: string;
   vat_number: string;
   address: string;
@@ -205,22 +209,120 @@ interface ValidationErrors {
   company_email: string;
   company_phone: string;
   sdi: string;
+  pec: string;
 }
 
 // Aggiungi una funzione di validazione SDI
-const validateSdiField = (sdi: string | undefined, country: string): boolean => {
-  // Se non è Italia, non serve validare
-  if (country !== 'IT') return true;
+function validateSdiField(sdi: string | undefined, country: string): boolean {
+  if (country !== 'IT') return true; // SDI è richiesto solo per l'Italia
   
-  // Per l'Italia, deve essere presente almeno PEC o SDI
-  // Se c'è SDI, deve essere esattamente 7 caratteri alfanumerici
-  if (sdi) {
-    return /^[A-Z0-9]{7}$/.test(sdi.toUpperCase());
+  if (!sdi) {
+    return false; // Per l'Italia, SDI è richiesto se non c'è PEC
   }
-  
-  // Se non c'è SDI, deve esserci almeno la PEC
-  return !!companyForm.pec;
+
+  // Validazione del formato SDI
+  return /^[A-Z0-9]{7}$/.test(sdi.toUpperCase());
+}
+
+// Aggiungi la regex per la validazione PEC
+const pecRegex = /^[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)*pec(?:\.it|\.ad|\.ch)$/;
+
+// Funzione di validazione PEC
+function validatePec(pec: string | undefined): boolean {
+  if (!pec) return true; // PEC è opzionale
+  return pecRegex.test(pec);
+}
+
+// Modifica la funzione di validazione PEC/SDI
+const validateItalianFields = (pec: string | undefined, sdi: string | undefined): { isValid: boolean; message?: string } => {
+  // Se nessuno dei due è stato toccato, ritorna true
+  if (!pec && !sdi) return { isValid: true };
+
+  // Se uno dei due è stato toccato ma è vuoto
+  if ((pec === '' && !sdi) || (sdi === '' && !pec)) {
+    return { 
+      isValid: false,
+      message: 'Either a valid PEC or SDI is required for Italian companies'
+    };
+  }
+
+  // Validazione formato PEC
+  if (pec && !validatePec(pec)) {
+    return { isValid: false };
+  }
+
+  // Validazione formato SDI
+  if (sdi && !validateSdiField(sdi, 'IT')) {
+    return { isValid: false };
+  }
+
+  return { isValid: true };
+}
+
+// Modifica la funzione checkVatNumber
+const checkVatNumber = async (
+  vat: string, 
+  country: string, 
+  setValidationErrors: React.Dispatch<React.SetStateAction<ValidationErrors>>
+) => {
+  try {
+    const response = await fetch('/api/auth/check-vat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vat_number: vat, country })
+    });
+
+    if (!response.ok) {
+      setValidationErrors(prev => ({
+        ...prev,
+        vat_number: `VAT number ${vat} is already registered`
+      }));
+      return false;
+    }
+
+    setValidationErrors(prev => ({ ...prev, vat_number: '' }));
+    return true;
+  } catch (error) {
+    console.error('Error checking VAT:', error);
+    return false;
+  }
 };
+
+// Aggiorna lo stile del PhoneInput per renderlo uguale agli altri input
+const phoneInputClass = `
+  [&_.PhoneInput]:flex 
+  [&_.PhoneInput]:h-12 
+  [&_.PhoneInput]:border 
+  [&_.PhoneInput]:border-input 
+  [&_.PhoneInput]:rounded-md 
+  [&_.PhoneInput]:bg-white
+  [&_.PhoneInputCountry]:h-12 
+  [&_.PhoneInputCountry]:pl-3
+  [&_.PhoneInputCountry]:pr-3
+  [&_.PhoneInputCountry]:flex
+  [&_.PhoneInputCountry]:items-center
+  [&_.PhoneInputCountry]:gap-2
+  [&_.PhoneInputCountry]:border-r
+  [&_.PhoneInputCountry]:border-input
+  [&_.PhoneInputCountry]:bg-transparent
+  [&_.PhoneInputCountrySelect]:opacity-0
+  [&_.PhoneInputCountrySelect]:absolute
+  [&_.PhoneInputCountrySelectArrow]:hidden
+  [&_.PhoneInputInput]:h-12 
+  [&_.PhoneInputInput]:flex-1
+  [&_.PhoneInputInput]:border-0
+  [&_.PhoneInputInput]:bg-transparent
+  [&_.PhoneInputInput]:pl-3
+  [&_.PhoneInputInput]:outline-none
+  [&_.PhoneInputInput]:ring-0
+  [&_.PhoneInputInput]:text-base
+`
+
+// Aggiungi una funzione per validare la password
+const validatePassword = (password: string): boolean => {
+  // Password deve essere almeno 8 caratteri
+  return password.length >= 8;
+}
 
 export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
   const router = useRouter()
@@ -233,7 +335,9 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     cognome: '',
     email: '',
     telefono: '',
-    password: ''
+    password: '',
+    ruolo: 'cliente',
+    attivo: false
   })
 
   const [companyForm, setCompanyForm] = useState<CompanyFormData>({
@@ -250,7 +354,8 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     sdi: '',
     province: '',
     acceptPrivacy: false,
-    acceptNewsletter: false
+    acceptNewsletter: false,
+    region: '',  // Aggiunto il campo region
   })
 
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -424,13 +529,6 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     }
   }
 
-  // Funzione per validare la password in tempo reale
-  const validatePassword = (password: string) => {
-    const isValid = password.length >= 8
-    setIsPasswordValid(isValid)
-    return isValid
-  }
-
   // Aggiungi checkbox per usare i dati personali
   const [usePersonalData, setUsePersonalData] = useState(false)
 
@@ -445,12 +543,13 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     }
   }, [usePersonalData, userForm.email, userForm.telefono])
 
-  // Aggiungi stati per gli errori di validazione
+  // Stato per gli errori di validazione
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({
     nome: '',
     cognome: '',
     email: '',
     password: '',
+    confirmPassword: '',
     telefono: '',
     company_name: '',
     vat_number: '',
@@ -459,8 +558,9 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     zip_code: '',
     company_email: '',
     company_phone: '',
-    sdi: ''
-  });
+    sdi: '',
+    pec: ''
+  })
 
   // Aggiorna la funzione validateField per includere i campi aziendali
   const validateField = (field: keyof ValidationErrors, value: string) => {
@@ -578,10 +678,16 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
         break;
 
       case 'sdi':
-        if (!validateSdi(value)) {
+      case 'pec':
+        const validation = validateItalianFields(
+          field === 'pec' ? value : companyForm.pec,
+          field === 'sdi' ? value : companyForm.sdi
+        );
+        
+        if (!validation.isValid) {
           setValidationErrors(prev => ({
             ...prev,
-            sdi: 'SDI must be 7 alphanumeric characters'
+            [field]: validation.message
           }));
           return false;
         }
@@ -596,6 +702,79 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
   const validateCompanyName = (name: string) => {
     return name.trim().length >= 2;
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validazione finale prima dell'invio
+    const italianValidation = validateItalianFields(
+      companyForm.pec,
+      companyForm.sdi,
+      companyForm.country
+    );
+
+    if (!italianValidation.isValid) {
+      setValidationErrors(prev => ({
+        ...prev,
+        sdi: italianValidation.message,
+        pec: italianValidation.message
+      }));
+      return;
+    }
+
+    // ... resto del codice di submit ...
+  }
+
+  // Aggiungi questa funzione per validare il form
+  const isFormValid = () => {
+    // Validazione campi obbligatori
+    if (!companyForm.company_name ||
+        !companyForm.vat_number ||
+        !companyForm.business ||
+        !companyForm.country ||
+        !companyForm.address ||
+        !companyForm.company_email ||
+        !companyForm.company_phone ||
+        !companyForm.acceptPrivacy) {
+      return false;
+    }
+
+    // Validazione VAT number
+    const vatValidation = validateVatNumber(companyForm.vat_number, companyForm.country);
+    if (!vatValidation.isValid) {
+      return false;
+    }
+
+    // Validazione email aziendale
+    if (!validateEmail(companyForm.company_email)) {
+      return false;
+    }
+
+    // Validazione telefono aziendale
+    if (!validatePhoneNumber(companyForm.company_phone)) {
+      return false;
+    }
+
+    // Validazione lunghezza minima
+    if (companyForm.company_name.trim().length < 2 ||
+        companyForm.address.trim().length < 5) {
+      return false;
+    }
+
+    // Per l'Italia, verifica PEC/SDI
+    if (companyForm.country === 'IT') {
+      if (!validateItalianFields(companyForm.pec, companyForm.sdi)) {
+        return false;
+      }
+    }
+
+    // Verifica che non ci siano errori di validazione
+    if (Object.values(validationErrors).some(error => error !== '')) {
+      return false;
+    }
+
+    return true;
+  }
 
   return (
     <div className="w-full">
@@ -706,17 +885,24 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                     value={userForm.telefono}
                     onChange={(value) => {
                       setUserForm(prev => ({ ...prev, telefono: value || '' }));
-                      setValidationErrors(prev => ({ ...prev, telefono: '' }));
-                    }}
-                    onBlur={() => {
-                      if (userForm.telefono) {
-                        validateField('telefono', userForm.telefono);
+                      // Valida mentre l'utente digita
+                      if (value && !validatePhoneNumber(value)) {
+                        setValidationErrors(prev => ({
+                          ...prev,
+                          telefono: 'Invalid phone number'
+                        }));
+                      } else {
+                        setValidationErrors(prev => ({ ...prev, telefono: '' }));
                       }
                     }}
-                    className="[&_.PhoneInputInput]:h-12 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:bg-white [&_.PhoneInputCountry]:h-12 [&_.PhoneInput]:flex [&_.PhoneInput]:items-center [&_.PhoneInput]:h-12 [&_.PhoneInput]:border [&_.PhoneInput]:border-input [&_.PhoneInput]:rounded-md [&_.PhoneInput]:p-0 [&_.PhoneInputCountry]:p-0 [&_.PhoneInputCountry]:pl-3"
-                    error={userForm.telefono ? (validatePhoneNumber(userForm.telefono) ? undefined : 'Invalid phone number') : undefined}
+                    className={`${phoneInputClass} ${
+                      validationErrors.telefono ? '[&_.PhoneInput]:border-red-500' : ''
+                    }`}
                     countries={allowedPhoneCountries}
                   />
+                  {validationErrors.telefono && (
+                    <p className="text-xs text-red-500 mt-1">{validationErrors.telefono}</p>
+                  )}
                 </div>
               </div>
 
@@ -726,45 +912,35 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                   <Label className="font-medium text-gray-900">Password *</Label>
                   <div className="relative">
                     <Input
-                      id="password"
                       type={showPassword ? "text" : "password"}
-                      required
                       value={userForm.password}
-                      onChange={e => {
-                        const value = e.target.value;
-                        setUserForm(prev => ({ ...prev, password: value }));
-                        setValidationErrors(prev => ({ ...prev, password: '' }));
+                      onChange={(e) => {
+                        setUserForm(prev => ({ ...prev, password: e.target.value }));
                       }}
-                      onBlur={e => validateField('password', e.target.value)}
                       placeholder="Create a secure password (min. 8 characters)"
-                      className={`h-12 px-4 bg-white placeholder:text-muted-foreground/50 pr-10
-                        ${validationErrors.password ? 'border-red-500 focus:border-red-500' : ''}`}
+                      className="h-12 pr-10"
                     />
-                    {userForm.password.length >= 8 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2"
-                      >
-                        {showPassword ? 
-                          <EyeOff className="h-5 w-5 text-gray-500" /> : 
-                          <Eye className="h-5 w-5 text-gray-500" />
-                        }
-                      </button>
-                    )}
-                    {validationErrors.password && (
-                      <p className="text-xs text-red-500 mt-1">{validationErrors.password}</p>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPassword ? 
+                        <EyeOff className="h-5 w-5 text-gray-500" /> : 
+                        <Eye className="h-5 w-5 text-gray-500" />
+                      }
+                    </button>
                   </div>
+                  {userForm.password && userForm.password.length < 8 && (
+                    <p className="text-xs text-red-500 mt-1">Password must be at least 8 characters</p>
+                  )}
                 </div>
 
-                {/* Mostra il campo conferma password solo se la password è valida */}
-                {userForm.password.length >= 8 && !validationErrors.password && (
+                {userForm.password.length >= 8 && (
                   <div className="space-y-2">
                     <Label className="font-medium text-gray-900">Confirm Password *</Label>
                     <div className="relative">
                       <Input
-                        id="confirmPassword"
                         type={showPassword ? "text" : "password"}
                         required
                         value={confirmPassword}
@@ -773,10 +949,10 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                         className={`h-12 px-4 bg-white placeholder:text-muted-foreground/50
                           ${confirmPassword && confirmPassword !== userForm.password ? 'border-red-500' : ''}`}
                       />
-                      {confirmPassword && confirmPassword !== userForm.password && (
-                        <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-                      )}
                     </div>
+                    {confirmPassword && confirmPassword !== userForm.password && (
+                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -784,33 +960,35 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
 
             <div className="pt-2">
               <Button
-                type="submit"
-                className="w-full h-12 bg-black hover:bg-black/90 text-white"
+                onClick={() => setStep(2)}
                 disabled={
-                  loading || 
-                  // Password checks
-                  (userForm.password.length >= 8 && userForm.password !== confirmPassword) ||
-                  // Email check
-                  !isEmailAvailable ||
-                  // Required fields
                   !userForm.nome ||
                   !userForm.cognome ||
                   !userForm.email ||
                   !userForm.telefono ||
-                  // Validation errors
-                  Object.values(validationErrors).some(error => error !== '') ||
-                  // Phone validation
+                  !userForm.password ||
+                  !confirmPassword ||
+                  userForm.password !== confirmPassword ||
+                  !validateEmail(userForm.email) ||
                   !validatePhoneNumber(userForm.telefono)
                 }
+                className="w-full h-12 bg-black hover:bg-black/90 text-white"
               >
-                {loading ? 'Loading...' : 'Continue'}
+                Continue
               </Button>
             </div>
           </form>
         </div>
 
         <div className={`transition-all duration-300 ${step === 2 ? 'opacity-100' : 'opacity-0 hidden'}`}>
-          <form onSubmit={handleCompanySubmit} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              // Previeni il submit di default
+              e.preventDefault()
+              handleCompanySubmit(e)
+            }} 
+            className="space-y-6"
+          >
             {/* Company Info */}
             <div className="space-y-4">
               {/* Company Name */}
@@ -841,13 +1019,38 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                 <Select 
                   value={companyForm.country} 
                   onValueChange={(value) => {
+                    // Reset completo di tutti i campi dell'indirizzo
                     setCompanyForm(prev => ({ 
                       ...prev, 
                       country: value,
+                      // Reset dei campi del telefono
                       company_phone: !companyForm.company_phone ? '' : prev.company_phone,
-                      // Reset VAT number when country changes
-                      vat_number: ''
-                    }))
+                      // Reset della partita IVA
+                      vat_number: '',
+                      // Reset COMPLETO di tutti i campi dell'indirizzo
+                      address: '',
+                      city: '',
+                      zip_code: '',
+                      province: '',
+                      region: '',
+                      // Reset PEC e SDI se il nuovo paese non è IT
+                      ...(value !== 'IT' ? { pec: '', sdi: '' } : {})
+                    }));
+
+                    // Reset degli errori di validazione
+                    setValidationErrors(prev => ({
+                      ...prev,
+                      address: '',
+                      city: '',
+                      zip_code: '',
+                      province: '',
+                      vat_number: '',
+                      ...(value !== 'IT' ? { pec: '', sdi: '' } : {})
+                    }));
+
+                    // Non c'è bisogno di resettare l'input dell'indirizzo
+                    // perché il componente AddressAutocomplete si resetta automaticamente
+                    // quando cambia il paese grazie all'useEffect che abbiamo aggiunto
                   }}
                 >
                   <SelectTrigger className="h-12 px-4 bg-white">
@@ -881,40 +1084,57 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                     id="vat_number"
                     required
                     value={companyForm.vat_number}
-                    onChange={e => {
+                    onChange={async (e) => {
                       const value = e.target.value;
                       setCompanyForm(prev => ({ ...prev, vat_number: value }));
-                      setValidationErrors(prev => ({ ...prev, vat_number: '' }));
-                    }}
-                    onBlur={e => {
-                      if (companyForm.country && e.target.value) {
-                        const validation = validateVatNumber(e.target.value, companyForm.country);
+
+                      // Valida il formato mentre l'utente digita
+                      if (companyForm.country && value) {
+                        const validation = validateVatNumber(value, companyForm.country);
                         if (!validation.isValid) {
                           setValidationErrors(prev => ({
                             ...prev,
                             vat_number: validation.message
                           }));
+                        } else {
+                          // Se il formato è valido, controlla se è già registrata
+                          try {
+                            const response = await fetch('/api/auth/check-vat', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                vat_number: value, 
+                                country: companyForm.country 
+                              })
+                            });
+
+                            const data = await response.json();
+                            
+                            if (!response.ok) {
+                              setValidationErrors(prev => ({
+                                ...prev,
+                                vat_number: data.error || 'VAT number already registered'
+                              }));
+                            } else {
+                              setValidationErrors(prev => ({ ...prev, vat_number: '' }));
+                            }
+                          } catch (error) {
+                            console.error('Error checking VAT:', error);
+                          }
                         }
+                      } else {
+                        setValidationErrors(prev => ({ ...prev, vat_number: '' }));
                       }
                     }}
                     placeholder={companyForm.country === 'IT' ? "11 digits (e.g. 12345678901)" : 
                                 companyForm.country ? `VAT number for ${companyForm.country}` : 
                                 "Select country first"}
                     className={`h-12 px-4 bg-white placeholder:text-muted-foreground/50
-                      ${validationErrors.vat_number || 
-                        (companyForm.vat_number && companyForm.country && 
-                         !validateVatNumber(companyForm.vat_number, companyForm.country).isValid) 
-                         ? 'border-red-500 focus:border-red-500' : ''}`}
+                      ${validationErrors.vat_number ? 'border-red-500 focus:border-red-500 ring-red-500' : ''}`}
                     disabled={!companyForm.country}
                   />
                   {validationErrors.vat_number && (
                     <p className="text-xs text-red-500 mt-1">{validationErrors.vat_number}</p>
-                  )}
-                  {!validationErrors.vat_number && companyForm.vat_number && companyForm.country && 
-                   !validateVatNumber(companyForm.vat_number, companyForm.country).isValid && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {validateVatNumber(companyForm.vat_number, companyForm.country).message}
-                    </p>
                   )}
                 </div>
 
@@ -950,14 +1170,16 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                 <div className="space-y-2">
                   <Label className="font-medium text-gray-900">Address *</Label>
                   <AddressAutocomplete
-                    onAddressSelect={({ street_address, city, postal_code, country, province }) => {
+                    onAddressSelect={(address) => {
+                      // Previeni il comportamento di default
                       setCompanyForm(prev => ({
                         ...prev,
-                        address: street_address,
-                        city,
-                        zip_code: postal_code,
-                        province,
-                        country: country || prev.country
+                        address: address.street_address,
+                        city: address.city,
+                        zip_code: address.postal_code,
+                        province: address.province,
+                        region: address.region,
+                        country: address.country || prev.country
                       }))
                       setValidationErrors(prev => ({
                         ...prev,
@@ -1046,9 +1268,10 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                         validateField('company_phone', companyForm.company_phone);
                       }
                     }}
-                    className={`[&_.PhoneInputInput]:h-12 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:bg-white [&_.PhoneInputCountry]:h-12 [&_.PhoneInput]:flex [&_.PhoneInput]:items-center [&_.PhoneInput]:h-12 [&_.PhoneInput]:border [&_.PhoneInput]:border-input [&_.PhoneInput]:rounded-md [&_.PhoneInput]:p-0 [&_.PhoneInputCountry]:p-0 [&_.PhoneInputCountry]:pl-3 ${
+                    className={`${phoneInputClass} ${
                       validationErrors.company_phone ? '[&_.PhoneInput]:border-red-500' : ''
                     }`}
+                    countries={allowedPhoneCountries}
                   />
                   {validationErrors.company_phone && (
                     <p className="text-xs text-red-500">{validationErrors.company_phone}</p>
@@ -1065,14 +1288,30 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                       <Input
                         type="email"
                         value={companyForm.pec || ''}
-                        onChange={e => setCompanyForm(prev => ({ ...prev, pec: e.target.value }))}
+                        onChange={e => {
+                          const value = e.target.value;
+                          setCompanyForm(prev => ({ ...prev, pec: value }));
+                          
+                          // Valida solo il formato PEC
+                          if (value && !validatePec(value)) {
+                            setValidationErrors(prev => ({
+                              ...prev,
+                              pec: 'Invalid PEC format'
+                            }));
+                          } else {
+                            setValidationErrors(prev => ({
+                              ...prev,
+                              pec: '',
+                              italianFields: '' // Rimuovi il messaggio globale se PEC è valida
+                            }));
+                          }
+                        }}
                         placeholder="pec@company.com"
-                        className={`h-12 ${
-                          companyForm.country === 'IT' && 
-                          !companyForm.pec && 
-                          !companyForm.sdi ? 'border-red-500' : ''
-                        }`}
+                        className={`h-12 ${validationErrors.pec ? 'border-red-500' : ''}`}
                       />
+                      {validationErrors.pec && (
+                        <p className="text-xs text-red-500">{validationErrors.pec}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -1083,41 +1322,38 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                         onChange={e => {
                           const value = e.target.value.toUpperCase();
                           if (value.length <= 7 && value.split('').every(validateSdiChar)) {
-                            setCompanyForm(prev => ({ ...prev, sdi: value }))
-                          }
-                        }}
-                        onBlur={() => {
-                          if (companyForm.sdi && !validateSdiField(companyForm.sdi, companyForm.country)) {
-                            setValidationErrors(prev => ({
-                              ...prev,
-                              sdi: 'SDI code must be 7 alphanumeric characters'
-                            }));
-                          } else {
-                            setValidationErrors(prev => ({ ...prev, sdi: '' }));
+                            setCompanyForm(prev => ({ ...prev, sdi: value }));
+                            
+                            // Valida SDI
+                            if (value.length === 7 && validateSdiField(value, 'IT')) {
+                              setValidationErrors(prev => ({
+                                ...prev,
+                                sdi: '',
+                                italianFields: '' // Rimuovi il messaggio globale se SDI è valido
+                              }));
+                            } else if (value.length > 0) {
+                              setValidationErrors(prev => ({
+                                ...prev,
+                                sdi: 'SDI must be 7 characters'
+                              }));
+                            }
                           }
                         }}
                         placeholder="0000000"
-                        className={`h-12 ${
-                          (companyForm.country === 'IT' && 
-                           !companyForm.pec && 
-                           !companyForm.sdi) ||
-                          (companyForm.sdi && !validateSdiField(companyForm.sdi, companyForm.country))
-                            ? 'border-red-500 focus:border-red-500'
-                            : ''
-                        }`}
+                        className={`h-12 ${validationErrors.sdi ? 'border-red-500' : ''}`}
                       />
-                      {companyForm.sdi && !validateSdiField(companyForm.sdi, companyForm.country) && (
-                        <p className="text-xs text-red-500 mt-1">
-                          SDI code must be 7 alphanumeric characters
-                        </p>
-                      )}
-                      {companyForm.country === 'IT' && !companyForm.pec && !companyForm.sdi && (
-                        <p className="text-xs text-red-500 mt-1">
-                          Either PEC or SDI is required for Italian companies
-                        </p>
+                      {validationErrors.sdi && (
+                        <p className="text-xs text-red-500">{validationErrors.sdi}</p>
                       )}
                     </div>
                   </div>
+
+                  {/* Mostra il messaggio globale solo se entrambi i campi sono vuoti */}
+                  {!companyForm.pec && !companyForm.sdi && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Either a valid PEC or SDI is required for Italian companies
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1168,34 +1404,16 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                 Back
               </Button>
               <Button 
-                type="submit" 
+                type="submit"
+                onClick={(e) => {
+                  // Previeni il submit se il form non è valido
+                  if (!isFormValid()) {
+                    e.preventDefault();
+                    return;
+                  }
+                }}
                 className="flex-1 h-12 bg-black hover:bg-black/90 text-white"
-                disabled={
-                  loading ||
-                  // Campi obbligatori
-                  !companyForm.company_name ||
-                  !companyForm.vat_number ||
-                  !companyForm.business ||
-                  !companyForm.country ||
-                  !companyForm.address ||
-                  !companyForm.company_email ||
-                  !companyForm.company_phone ||
-                  // Validazioni specifiche
-                  !validateVatNumber(companyForm.vat_number, companyForm.country).isValid ||
-                  !validateEmail(companyForm.company_email) ||
-                  !validatePhoneNumber(companyForm.company_phone) ||
-                  // Validazione lunghezza minima
-                  companyForm.company_name.trim().length < 2 ||
-                  companyForm.address.trim().length < 5 ||
-                  // Privacy obbligatoria
-                  !companyForm.acceptPrivacy ||
-                  // Errori di validazione
-                  Object.values(validationErrors).some(error => error !== '') ||
-                  // Validazione SDI per l'Italia
-                  !validateSdiField(companyForm.sdi, companyForm.country) ||
-                  // Requisiti specifici per l'Italia
-                  (companyForm.country === 'IT' && !companyForm.pec && !companyForm.sdi)
-                }
+                disabled={loading || !isFormValid()}
               >
                 {loading ? (
                   <div className="flex items-center justify-center">

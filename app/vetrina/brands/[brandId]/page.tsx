@@ -320,7 +320,7 @@ export default function BrandPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 mt-14">
         <Skeleton className="h-8 w-48 mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
@@ -333,7 +333,7 @@ export default function BrandPage() {
 
   if (error || !brand) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 mt-14">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error || 'Brand non trovato'}</AlertDescription>
@@ -343,7 +343,7 @@ export default function BrandPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 mt-14">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <Button 

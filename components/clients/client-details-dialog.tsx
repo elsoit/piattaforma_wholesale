@@ -44,14 +44,14 @@ interface Client {
   city: string
   stato: 'attivo' | 'inattivo' | 'in_attesa_di_attivazione' | 'eliminata'
   created_at: string
-  user: {
+  user?: {
     id: string
     nome: string
     cognome: string
     email: string
     attivo: boolean
-    email_verified: boolean
-    email_verified_at: string
+    email_verified?: boolean
+    email_verified_at?: string
   }
   company_email: string
   company_phone: string
@@ -60,6 +60,8 @@ interface Client {
   pec?: string
   sdi?: string
   brands?: Brand[]
+  province: string
+  region: string
 }
 
 interface Brand {
@@ -478,7 +480,17 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   }
 
   const handleActivate = async () => {
-    if (!localClient) return
+    if (!localClient?.user) return;
+
+    // Verifica se l'email non è verificata
+    if (!localClient.user.email_verified) {
+      const confirmActivation = window.confirm(
+        'L\'email dell\'utente non è stata verificata. Vuoi procedere comunque con l\'attivazione?'
+      )
+      if (!confirmActivation) {
+        return;
+      }
+    }
 
     try {
       setIsLoading(true)
@@ -486,7 +498,10 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          isFirstActivation: localClient.stato === 'in_attesa_di_attivazione'
+        })
       })
 
       const data = await response.json() as { message: string, success: boolean }
@@ -495,16 +510,15 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
         throw new Error(data.message || 'Errore durante l\'attivazione')
       }
 
-      // Se il cliente è in stato 'in_attesa_di_attivazione', attiva anche l'utente
       const shouldActivateUser = localClient.stato === 'in_attesa_di_attivazione'
 
       const updatedClient: Client = {
         ...localClient,
         stato: 'attivo' as const,
-        user: {
+        user: localClient.user ? {
           ...localClient.user,
-          attivo: shouldActivateUser ? true : localClient.user.attivo // Modifica l'utente solo se necessario
-        }
+          attivo: shouldActivateUser ? true : localClient.user.attivo
+        } : undefined
       }
 
       setLocalClient(updatedClient)
@@ -565,7 +579,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   }
 
   const handleBlock = async () => {
-    if (!localClient) return
+    if (!localClient?.user) return;
 
     try {
       setIsLoading(true)
@@ -591,7 +605,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
       const updatedClient: Client = {
         ...localClient,
         stato: 'inattivo' as const,  // Modifichiamo SOLO lo stato del cliente
-        user: { ...localClient.user } // Copiamo l'oggetto user SENZA modifiche
+        user: localClient.user ? { ...localClient.user } : undefined
       }
       
       setLocalClient(updatedClient)
@@ -611,6 +625,12 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   }
 
   const handleUpdateBrands = async (updatedBrands: Brand[]) => {
+    // Verifica se il cliente è attivo
+    if (localClient.stato !== 'attivo') {
+      toast.error('Non è possibile associare brand a un cliente non attivo')
+      return
+    }
+
     try {
       setIsLoading(true)
       const response = await fetch(`/api/clients/${client.id}/brands`, {
@@ -637,6 +657,9 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
     const brandsList = brands || [];
     const selectedList = selectedBrands || [];
     
+    // Disabilita il selettore se il cliente non è attivo
+    const isDisabled = localClient.stato !== 'attivo';
+    
     return (
       <div>
         <h3 className="text-lg font-medium mb-4">Brand Associati</h3>
@@ -646,11 +669,14 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
               type="button"
               variant="outline"
               className="w-full justify-start"
-              onClick={() => setOpenBrandSelector(!openBrandSelector)}
+              onClick={() => !isDisabled && setOpenBrandSelector(!openBrandSelector)}
+              disabled={isDisabled}
             >
               {selectedList.length > 0
                 ? `${selectedList.length} brand selezionati`
-                : "Seleziona brand"}
+                : isDisabled 
+                  ? "Cliente non attivo"
+                  : "Seleziona brand"}
             </Button>
 
             {openBrandSelector && (
@@ -681,8 +707,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                           const updatedBrands = isSelected
                             ? selectedList.filter((b) => b.id !== brand.id)
                             : [...selectedList, brand];
-                          handleUpdateBrands(updatedBrands);
-                          setOpenBrandSelector(false);
+                          setSelectedBrands(updatedBrands);
                         }}
                       >
                         {isSelected ? (
@@ -694,6 +719,26 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                       </div>
                     );
                   })}
+                </div>
+                <div className="p-2 border-t flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOpenBrandSelector(false)}
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      handleUpdateBrands(selectedList);
+                      setOpenBrandSelector(false);
+                    }}
+                  >
+                    Salva
+                  </Button>
                 </div>
               </div>
             )}
@@ -771,7 +816,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                     disabled={isLoading}
                     className="px-2 py-0.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                   >
-                    {isLoading ? 'Attivazione...' : 'Attiva Cliente'}
+                    {isLoading ? 'Attivazione...' : localClient.stato === 'in_attesa_di_attivazione' ? 'Abilita Cliente' : 'Attiva Cliente'}
                   </button>
                 )}
 
@@ -828,6 +873,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                   <h3 className="text-lg font-medium mb-4">Sede Legale</h3>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="grid grid-cols-2 gap-4">
+                      {/* Indirizzo completo */}
                       <div className="col-span-2">
                         {isEditing ? (
                           renderInputField('Indirizzo', 'address', formData.address, handleChange, 'text', fieldErrors, setFieldErrors)
@@ -835,17 +881,38 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                           renderField('Indirizzo', 'address', localClient.address)
                         )}
                       </div>
-                      {isEditing ? (
-                        <>
-                          {renderInputField('Città', 'city', formData.city, handleChange, 'text', fieldErrors, setFieldErrors)}
-                          {renderInputField('CAP', 'zip_code', formData.zip_code, handleChange, 'text', fieldErrors, setFieldErrors)}
-                        </>
-                      ) : (
-                        <>
-                          {renderField('Città', 'city', localClient.city)}
-                          {renderField('CAP', 'zip_code', localClient.zip_code)}
-                        </>
-                      )}
+
+                      {/* Città e CAP */}
+                      <div>
+                        {isEditing ? (
+                          renderInputField('Città', 'city', formData.city, handleChange, 'text', fieldErrors, setFieldErrors)
+                        ) : (
+                          renderField('Città', 'city', localClient.city)
+                        )}
+                      </div>
+                      <div>
+                        {isEditing ? (
+                          renderInputField('CAP', 'zip_code', formData.zip_code, handleChange, 'text', fieldErrors, setFieldErrors)
+                        ) : (
+                          renderField('CAP', 'zip_code', localClient.zip_code)
+                        )}
+                      </div>
+
+                      {/* Provincia e Regione */}
+                      <div>
+                        {isEditing ? (
+                          renderInputField('Provincia', 'province', formData.province, handleChange, 'text', fieldErrors, setFieldErrors)
+                        ) : (
+                          renderField('Provincia', 'province', localClient.province || '-')
+                        )}
+                      </div>
+                      <div>
+                        {isEditing ? (
+                          renderInputField('Regione', 'region', formData.region, handleChange, 'text', fieldErrors, setFieldErrors)
+                        ) : (
+                          renderField('Regione', 'region', localClient.region || '-')
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -902,16 +969,16 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                       <div>
                         <p className="text-sm font-medium">
                           Stato: {' '}
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            ${localClient.user.email_verified 
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                            ${localClient?.user?.email_verified 
                               ? 'bg-green-100 text-green-800'
                               : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {localClient.user.email_verified ? 'Verificata' : 'Non verificata'}
+                            {localClient?.user?.email_verified ? 'Verificata' : 'Non verificata'}
                           </span>
                         </p>
-                        {localClient.user.email_verified && localClient.user.email_verified_at && (
+                        {localClient?.user?.email_verified && localClient?.user?.email_verified_at && (
                           <p className="text-sm text-gray-500 mt-1">
                             Verificata il: {format(new Date(localClient.user.email_verified_at), 'PPP', { locale: it })}
                           </p>
@@ -919,7 +986,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                       </div>
                       
                       {/* Mostra il pulsante solo se l'email non è verificata */}
-                      {!localClient.user.email_verified && (
+                      {localClient?.user && !localClient.user.email_verified && (
                         <Button
                           size="sm"
                           onClick={handleResendVerification}

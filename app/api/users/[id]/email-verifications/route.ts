@@ -6,9 +6,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const userId = await params.id
+  const userId = await params.id
 
+  try {
     const result = await db.query(`
       SELECT 
         id,

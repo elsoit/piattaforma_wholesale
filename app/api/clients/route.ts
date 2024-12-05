@@ -16,9 +16,12 @@ export async function GET() {
         u.nome,
         u.cognome,
         u.email,
-        u.attivo
+        u.attivo,
+        u.email_verified,
+        u.email_verified_at
       FROM clients c
       LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.stato != 'eliminata'
       ORDER BY c.created_at DESC
     `)
 
@@ -30,9 +33,11 @@ export async function GET() {
       vat_number: row.vat_number,
       business: row.business,
       country: row.country,
-      city: row.city,
       address: row.address,
+      city: row.city,
       zip_code: row.zip_code,
+      province: row.province,
+      region: row.region,
       company_email: row.company_email,
       company_phone: row.company_phone,
       pec: row.pec,
@@ -40,13 +45,15 @@ export async function GET() {
       stato: row.stato,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      user: row.user_id ? {
+      user: {
         id: row.user_id,
         nome: row.nome,
         cognome: row.cognome,
         email: row.email,
-        attivo: row.attivo
-      } : null
+        attivo: row.attivo,
+        email_verified: row.email_verified,
+        email_verified_at: row.email_verified_at
+      }
     }))
 
     return NextResponse.json(clients)

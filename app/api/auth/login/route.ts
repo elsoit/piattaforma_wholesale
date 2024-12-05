@@ -106,7 +106,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Errore login:', error)
     return NextResponse.json(
-      createErrorResponse('Errore durante il login'),
+      createErrorResponse('Credenziali non valide'),
       { status: 500 }
     )
   }
