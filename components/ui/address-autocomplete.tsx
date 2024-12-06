@@ -226,6 +226,15 @@ export function AddressAutocomplete({
     };
   }, []);
 
+  useEffect(() => {
+    if (manualAddress.street_address || manualAddress.city || manualAddress.postal_code) {
+      onAddressSelect({
+        ...manualAddress,
+        country: country || '',
+      })
+    }
+  }, [manualAddress, country, onAddressSelect])
+
   return (
     <div className="space-y-4" ref={wrapperRef}>
       <div className="relative">

@@ -10,8 +10,12 @@ interface UserRow {
   password: string
   ruolo: string
   attivo: boolean
+  nome: string
+  cognome: string
   client_id: number | null
   client_stato: string | null
+  company_name: string | null
+  codice: string | null
 }
 
 export async function POST(request: Request) {
@@ -26,6 +30,8 @@ export async function POST(request: Request) {
         u.password,
         u.ruolo,
         u.attivo,
+        u.nome,
+        u.cognome,
         CASE 
           WHEN u.ruolo = 'cliente' THEN c.id 
           ELSE NULL 
@@ -33,7 +39,15 @@ export async function POST(request: Request) {
         CASE 
           WHEN u.ruolo = 'cliente' THEN c.stato 
           ELSE NULL 
-        END as client_stato
+        END as client_stato,
+        CASE 
+          WHEN u.ruolo = 'cliente' THEN c.company_name 
+          ELSE NULL 
+        END as company_name,
+        CASE 
+          WHEN u.ruolo = 'cliente' THEN c.codice 
+          ELSE NULL 
+        END as codice
       FROM users u
       LEFT JOIN clients c ON u.id = c.user_id
       WHERE u.email = $1
@@ -80,7 +94,10 @@ export async function POST(request: Request) {
         id: user.id,
         email: user.email,
         ruolo: user.ruolo,
-        clientId: user.client_id
+        clientId: user.client_id,
+        nome: user.nome,
+        cognome: user.cognome,
+        companyName: user.company_name
       },
       redirectUrl
     }))
@@ -96,9 +113,13 @@ export async function POST(request: Request) {
 
     response.cookies.set('session', user.id.toString(), cookieOptions)
     response.cookies.set('user_role', user.ruolo, cookieOptions)
+    response.cookies.set('user_name', `${user.nome} ${user.cognome}`, cookieOptions)
     
     if (user.client_id) {
       response.cookies.set('client_id', user.client_id.toString(), cookieOptions)
+      if (user.company_name) {
+        response.cookies.set('company_name', user.company_name, cookieOptions)
+      }
     }
 
     return response

@@ -12,8 +12,9 @@ export async function PATCH(
   { params }: { params: { id: string; filesid: string } }
 ) {
   try {
+    const { id, filesid } = params
     const data = await request.json() as FileUpdateData
-    console.log('Dati ricevuti:', params.id, params.filesid, data)
+    console.log('Dati ricevuti:', id, filesid, data)
     
     // Verifica che tutti i campi necessari siano presenti
     const { nome, description, tipo } = data
@@ -29,8 +30,8 @@ export async function PATCH(
     }
 
     console.log('Dati ricevuti:', {
-      catalogoId: params.id,
-      fileId: params.filesid,
+      catalogoId: id,
+      fileId: filesid,
       nome,
       description,
       tipo
@@ -40,7 +41,7 @@ export async function PATCH(
     const existingFile = await db.query(
       `SELECT id FROM catalogo_files 
        WHERE id = $1 AND catalogo_id = $2`,
-      [params.filesid, params.id]
+      [filesid, id]
     )
 
     if (existingFile.rows.length === 0) {
@@ -63,8 +64,8 @@ export async function PATCH(
         nome,
         description || null,
         tipo || null,
-        params.filesid,
-        params.id
+        filesid,
+        id
       ]
     )
 
@@ -90,39 +91,33 @@ export async function DELETE(
   { params }: { params: { id: string; filesid: string } }
 ) {
   try {
-    // Verifica che il file esista e appartenga al catalogo
-    const existingFile = await db.query(
-      `SELECT * FROM catalogo_files 
-       WHERE id = $1 AND catalogo_id = $2`,
-      [params.filesid, params.id]
+    const { id: catalogoId, filesid: fileId } = params
+    
+    // Recupera info file
+    const { rows: [file] } = await db.query(
+      'SELECT file_url FROM catalogo_files WHERE id = $1 AND catalogo_id = $2',
+      [fileId, catalogoId]
     )
 
-    if (existingFile.rows.length === 0) {
+    if (!file) {
       return NextResponse.json(
         { error: 'File non trovato' },
         { status: 404 }
       )
     }
 
-    // Elimina il file
+    // Elimina il record dal database
     await db.query(
-      `DELETE FROM catalogo_files 
-       WHERE id = $1 AND catalogo_id = $2`,
-      [params.filesid, params.id]
+      'DELETE FROM catalogo_files WHERE id = $1',
+      [fileId]
     )
 
-    return NextResponse.json({
-      success: true,
-      data: null
-    })
+    return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Errore eliminazione file:', error)
+    console.error('Errore nell\'eliminazione del file:', error)
     return NextResponse.json(
-      { 
-        error: 'Errore nell\'eliminazione del file',
-        details: error instanceof Error ? error.message : 'Errore sconosciuto'
-      },
+      { error: 'Errore nell\'eliminazione del file' },
       { status: 500 }
     )
   }

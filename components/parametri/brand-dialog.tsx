@@ -13,12 +13,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Brand } from '@/types/brand'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface BrandDialogProps {
   brand: Brand | null
   isOpen: boolean
   onClose: () => void
-  onSave: (brand: Brand) => Promise<void>
+  onSave: (brand: Partial<Brand>) => Promise<void>
 }
 
 export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps) {
@@ -28,6 +30,8 @@ export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps
     logo: ''
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string>('')
 
   useEffect(() => {
     if (brand) {
@@ -45,16 +49,21 @@ export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps
     }
   }, [brand])
 
+  const handlePreviewImage = () => {
+    if (imageUrl) {
+      setPreviewUrl(imageUrl)
+      setFormData(prev => ({ ...prev, logo: imageUrl }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     try {
-      await onSave({
-        id: brand?.id || '',
-        ...formData,
-        created_at: brand?.created_at || new Date(),
-        updated_at: new Date()
-      } as Brand)
+      await onSave(formData)
+      onClose()
+    } catch (error) {
+      console.error('Errore durante il salvataggio:', error)
     } finally {
       setIsLoading(false)
     }
@@ -77,11 +86,65 @@ export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps
             <label className="block text-sm font-medium text-gray-700">
               Logo
             </label>
-            <ImageUpload
-              value={formData.logo || ''}
-              onChange={(url) => setFormData({ ...formData, logo: url })}
-              disabled={isLoading}
-            />
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Inserisci URL immagine"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                />
+                <Button 
+                  type="button"
+                  variant="secondary"
+                  onClick={handlePreviewImage}
+                  disabled={!imageUrl}
+                >
+                  Anteprima
+                </Button>
+              </div>
+
+              {previewUrl && (
+                <div className="relative w-full h-40 border rounded-md overflow-hidden">
+                  <img
+                    src={previewUrl}
+                    alt="Anteprima logo"
+                    className="w-full h-full object-contain"
+                    onError={() => {
+                      setPreviewUrl('')
+                      toast.error('Errore nel caricamento dell\'immagine')
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setPreviewUrl('')
+                      setImageUrl('')
+                      setFormData(prev => ({ ...prev, logo: '' }))
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="text-center text-sm text-muted-foreground">
+                oppure
+              </div>
+
+              <ImageUpload
+                value={formData.logo || ''}
+                onChange={(url) => {
+                  setFormData(prev => ({ ...prev, logo: url }))
+                  setPreviewUrl('')
+                  setImageUrl('')
+                }}
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
           <div>
@@ -91,7 +154,7 @@ export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               disabled={isLoading}
               required
             />
@@ -103,8 +166,9 @@ export function BrandDialog({ brand, isOpen, onClose, onSave }: BrandDialogProps
             </label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              value={formData.description || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              disabled={isLoading}
             />
           </div>
 

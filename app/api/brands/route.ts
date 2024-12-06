@@ -11,6 +11,30 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search')
+    
+    // Se limit è -1, recupera tutti i record senza paginazione
+    if (limit === -1) {
+      let query = 'SELECT * FROM brands'
+      const params: any[] = []
+
+      if (search) {
+        query += ' WHERE name ILIKE $1'
+        params.push(`%${search}%`)
+      }
+
+      query += ' ORDER BY name ASC'
+      
+      const result = await db.query(query, params)
+      
+      return NextResponse.json({
+        data: result.rows,
+        total: result.rows.length,
+        page: 1,
+        limit: result.rows.length,
+        totalPages: 1
+      })
+    }
+
     const offset = (page - 1) * limit
 
     let query = 'SELECT * FROM brands'

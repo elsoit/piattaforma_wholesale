@@ -234,7 +234,14 @@ function validatePec(pec: string | undefined): boolean {
 }
 
 // Modifica la funzione di validazione PEC/SDI
-const validateItalianFields = (pec: string | undefined, sdi: string | undefined): { isValid: boolean; message?: string } => {
+const validateItalianFields = (
+  pec: string | undefined, 
+  sdi: string | undefined, 
+  country?: string
+): { isValid: boolean; message?: string } => {
+  // Se il paese non è Italia, non serve validare
+  if (country !== 'IT') return { isValid: true };
+  
   // Se nessuno dei due è stato toccato, ritorna true
   if (!pec && !sdi) return { isValid: true };
 
@@ -248,16 +255,22 @@ const validateItalianFields = (pec: string | undefined, sdi: string | undefined)
 
   // Validazione formato PEC
   if (pec && !validatePec(pec)) {
-    return { isValid: false };
+    return { 
+      isValid: false,
+      message: 'Invalid PEC format'
+    };
   }
 
   // Validazione formato SDI
   if (sdi && !validateSdiField(sdi, 'IT')) {
-    return { isValid: false };
+    return { 
+      isValid: false,
+      message: 'Invalid SDI format'
+    };
   }
 
   return { isValid: true };
-}
+};
 
 // Modifica la funzione checkVatNumber
 const checkVatNumber = async (
@@ -704,9 +717,8 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    // Validazione finale prima dell'invio
     const italianValidation = validateItalianFields(
       companyForm.pec,
       companyForm.sdi,
@@ -716,14 +728,13 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
     if (!italianValidation.isValid) {
       setValidationErrors(prev => ({
         ...prev,
-        sdi: italianValidation.message,
-        pec: italianValidation.message
+        sdi: italianValidation.message || '',
+        pec: italianValidation.message || ''
       }));
       return;
     }
-
-    // ... resto del codice di submit ...
-  }
+    // ... resto del codice
+  };
 
   // Aggiungi questa funzione per validare il form
   const isFormValid = () => {
@@ -775,6 +786,33 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
 
     return true;
   }
+
+  // Modifica la gestione della risposta API per il controllo VAT
+  const handleVatCheck = async (value: string) => {
+    try {
+      const response = await fetch('/api/auth/check-vat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          vat_number: value, 
+          country: companyForm.country 
+        })
+      });
+
+      const result = await response.json() as { error?: string };
+      
+      if (!response.ok) {
+        setValidationErrors(prev => ({
+          ...prev,
+          vat_number: result.error || 'VAT number already registered'
+        }));
+      } else {
+        setValidationErrors(prev => ({ ...prev, vat_number: '' }));
+      }
+    } catch (error) {
+      console.error('Error checking VAT:', error);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -1088,7 +1126,6 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                       const value = e.target.value;
                       setCompanyForm(prev => ({ ...prev, vat_number: value }));
 
-                      // Valida il formato mentre l'utente digita
                       if (companyForm.country && value) {
                         const validation = validateVatNumber(value, companyForm.country);
                         if (!validation.isValid) {
@@ -1097,30 +1134,7 @@ export function RegisterForm({ StepsIndicator }: RegisterFormProps) {
                             vat_number: validation.message
                           }));
                         } else {
-                          // Se il formato è valido, controlla se è già registrata
-                          try {
-                            const response = await fetch('/api/auth/check-vat', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ 
-                                vat_number: value, 
-                                country: companyForm.country 
-                              })
-                            });
-
-                            const data = await response.json();
-                            
-                            if (!response.ok) {
-                              setValidationErrors(prev => ({
-                                ...prev,
-                                vat_number: data.error || 'VAT number already registered'
-                              }));
-                            } else {
-                              setValidationErrors(prev => ({ ...prev, vat_number: '' }));
-                            }
-                          } catch (error) {
-                            console.error('Error checking VAT:', error);
-                          }
+                          await handleVatCheck(value);
                         }
                       } else {
                         setValidationErrors(prev => ({ ...prev, vat_number: '' }));

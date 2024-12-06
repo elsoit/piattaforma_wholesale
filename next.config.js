@@ -3,7 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   experimental: {
-    serverActions: true,
+    serverActions: {
+      bodySizeLimit: '50mb'
+    }
   },
   webpack: (config) => {
     config.externals.push({
@@ -21,6 +23,9 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 }
 

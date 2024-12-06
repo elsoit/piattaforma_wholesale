@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, ExternalLink, Search } from 'lucide-react'
+import { AlertCircle, ExternalLink, Search, PackageOpen } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Input } from '@/components/ui/input'
+import { RequestBrandsDialog } from '@/components/vetrina/request-brands-dialog'
 
 interface Brand {
   id: string
@@ -80,28 +81,68 @@ const BrandCard = ({ brand, onClick, index }: BrandCardProps) => {
                 className="text-sm text-muted-foreground h-[5em] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
               >
                 {brand.description}
-                {needsGradient && (
-                  <div className="sticky bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#f8f8f8] to-transparent pointer-events-none" />
-                )}
               </div>
+              {needsGradient && (
+                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#f8f8f8] to-transparent" />
+              )}
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-200">
-          <Badge variant="outline" className="bg-white">
-            Available Catalogs
-          </Badge>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          className="w-full group-hover:bg-primary group-hover:text-white transition-colors"
+        >
+          View Catalogs
+          <ExternalLink className="w-4 h-4 ml-2" />
+        </Button>
       </CardContent>
     </MotionCard>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="container mx-auto px-4 pt-20">
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded-md mb-2" />
+            <div className="h-4 w-72 bg-gray-100 rounded-md" />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-36 bg-gray-200 rounded-md animate-pulse" />
+            <div className="relative w-full md:w-72">
+              <div className="h-9 w-full bg-gray-100 rounded-md animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {[...Array(8)].map((_, i) => (
+          <div 
+            key={i} 
+            className="rounded-lg border border-gray-100 bg-white p-6"
+          >
+            <div className="h-32 bg-gray-50 rounded-lg mb-4 flex items-center justify-center">
+              <div className="h-16 w-16 bg-gray-200 rounded-full" />
+            </div>
+            
+            <div className="space-y-3">
+              <div className="h-6 w-3/4 bg-gray-200 rounded-md" />
+              <div className="space-y-2">
+                <div className="h-4 w-full bg-gray-100 rounded-md" />
+                <div className="h-4 w-5/6 bg-gray-100 rounded-md" />
+                <div className="h-4 w-4/6 bg-gray-100 rounded-md" />
+              </div>
+            </div>
+
+            <div className="mt-4 h-9 w-full bg-gray-200 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -121,24 +162,50 @@ export default function BrandsPage() {
   const subtitleOpacity = useTransform(scrollY, [0, 60], [1, 0])
   const subtitleHeight = useTransform(scrollY, [0, 60], [20, 0])
   const titleMargin = useTransform(scrollY, [0, 60], [8, 0])
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false)
+  const lettersContainerRef = useRef<HTMLDivElement>(null);
+
+  // Funzione per centrare la lettera attiva
+  const centerActiveLetter = (letter: string) => {
+    if (!lettersContainerRef.current) return;
+    
+    const container = lettersContainerRef.current;
+    const letterButton = container.querySelector(`[data-letter-button="${letter}"]`) as HTMLElement;
+    
+    if (!letterButton) return;
+
+    const containerWidth = container.offsetWidth;
+    const letterButtonLeft = letterButton.offsetLeft;
+    const letterButtonWidth = letterButton.offsetWidth;
+    
+    // Calcola la posizione di scroll necessaria per centrare la lettera
+    const scrollLeft = letterButtonLeft - (containerWidth / 2) + (letterButtonWidth / 2);
+    
+    container.scrollTo({
+      left: scrollLeft,
+      behavior: 'smooth'
+    });
+  };
 
   useEffect(() => {
     const updateScroll = () => {
-      setIsScrolled(window.scrollY > 0)
+      setIsScrolled(window.scrollY > 0);
       
       // Trova la lettera corrente in base allo scroll
-      const sections = document.querySelectorAll('[data-letter]')
+      const sections = document.querySelectorAll('[data-letter]');
       sections.forEach((section) => {
-        const rect = section.getBoundingClientRect()
+        const rect = section.getBoundingClientRect();
         if (rect.top <= 150 && rect.bottom >= 150) {
-          setCurrentLetter(section.getAttribute('data-letter') || '')
+          const letter = section.getAttribute('data-letter') || '';
+          setCurrentLetter(letter);
+          centerActiveLetter(letter);
         }
-      })
-    }
+      });
+    };
 
-    window.addEventListener('scroll', updateScroll)
-    return () => window.removeEventListener('scroll', updateScroll)
-  }, [])
+    window.addEventListener('scroll', updateScroll);
+    return () => window.removeEventListener('scroll', updateScroll);
+  }, []);
 
   const scrollToLetter = (letter: string) => {
     const element = document.querySelector(`[data-letter="${letter}"]`)
@@ -210,43 +277,7 @@ export default function BrandsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Your Brands</h1>
-              <p className="text-muted-foreground mt-2">
-                Select a brand to view available catalogs
-              </p>
-            </div>
-            
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-              <Input
-                type="text"
-                placeholder="Search brands..."
-                className="pl-10"
-                value=""
-                onChange={() => {}}
-                disabled
-              />
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="overflow-hidden">
-              <CardContent className="p-6">
-                <Skeleton className="h-32 w-full mb-4" />
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
   if (error) {
@@ -260,6 +291,39 @@ export default function BrandsPage() {
     )
   }
 
+  if (brands.length === 0) {
+    return (
+      <>
+        <div className="container mx-auto px-4 pt-20">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div className="bg-gray-50 p-4 rounded-full mb-6">
+              <PackageOpen className="h-12 w-12 text-gray-400" />
+            </div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+              No Active Brands
+            </h2>
+            <p className="text-gray-500 mb-8 max-w-md">
+              You don't have any active brands yet. Request access to start exploring our catalogs.
+            </p>
+            <Button
+              onClick={() => setIsRequestDialogOpen(true)}
+              className="bg-gray-900 text-white hover:bg-gray-800"
+              size="lg"
+            >
+              Request Brand Access
+            </Button>
+          </div>
+        </div>
+
+        <RequestBrandsDialog
+          isOpen={isRequestDialogOpen}
+          onClose={() => setIsRequestDialogOpen(false)}
+          activeBrands={brands}
+        />
+      </>
+    )
+  }
+
   const handleBrandClick = (brandId: string) => {
     router.push(`/vetrina/brands/${brandId}`)
   }
@@ -267,7 +331,7 @@ export default function BrandsPage() {
   const groupedAndSortedBrands = sortedGroupedBrands(filteredBrands)
 
   return (
-    <div className="container  mx-auto px-4 ">
+    <div className="container mx-auto px-2 sm:px-4">
       <motion.div 
         ref={headerRef}
         style={{
@@ -275,21 +339,36 @@ export default function BrandsPage() {
           paddingTop: headerPadding,
           paddingBottom: headerPadding
         }}
-        className="sticky top-16 z-20 bg-white -mx-4 px-4"
+        className="sticky top-16 z-20 bg-white -mx-2 sm:-mx-4 px-2 sm:px-4"
       >
-        <div className="flex flex-col md:flex-row bg-white md:items-center md:justify-between gap-4  h-full ">
-          <div>
+        <div className="flex flex-col md:flex-row gap-3 h-full">
+          {/* Header principale */}
+          <div className="flex items-center justify-between flex-1">
             {isScrolled ? (
-              <div className="flex items-center gap-6">
-                <span className="text-4xl font-bold text-primary">{currentLetter}</span>
-                <div className="flex gap-3 items-center text-sm font-medium">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl md:text-4xl font-bold text-primary shrink-0">
+                  {currentLetter}
+                </span>
+                <div 
+                  ref={lettersContainerRef}
+                  className="flex gap-2 items-center overflow-x-auto scrollbar-none max-w-[200px] sm:max-w-none scroll-smooth"
+                >
                   {groupedAndSortedBrands.map(([letter]) => (
                     <button
                       key={letter}
-                      onClick={() => scrollToLetter(letter)}
-                      className={`hover:text-primary transition-colors ${
-                        currentLetter === letter ? 'text-primary' : 'text-muted-foreground'
-                      }`}
+                      data-letter-button={letter}
+                      onClick={() => {
+                        scrollToLetter(letter);
+                        centerActiveLetter(letter);
+                      }}
+                      className={`
+                        transition-all shrink-0 w-8 h-8 
+                        flex items-center justify-center
+                        ${currentLetter === letter 
+                          ? 'text-gray-900 font-bold text-base' // Lettera attiva: più grande e in grassetto
+                          : 'text-gray-500 font-normal text-sm hover:text-gray-900' // Lettere inattive: più piccole e grigie
+                        }
+                      `}
                     >
                       {letter}
                     </button>
@@ -298,26 +377,62 @@ export default function BrandsPage() {
               </div>
             ) : (
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                  Your Brands
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+                  Active Brands
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Select a brand to view available catalogs
+                  Browse and access our brand catalogs
                 </p>
               </div>
             )}
-            
+
+            {/* Pulsante Request e Search su desktop */}
+            <div className="hidden md:flex items-center gap-3">
+              <Button
+                onClick={() => setIsRequestDialogOpen(true)}
+                variant="outline"
+                size="sm"
+                className="whitespace-nowrap shrink-0"
+              >
+                Request New Brand
+              </Button>
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search brands..."
+                  className="pl-10 bg-white border-gray-200"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
+
+            {/* Solo pulsante Request su mobile */}
+            <div className="md:hidden">
+              <Button
+                onClick={() => setIsRequestDialogOpen(true)}
+                variant="outline"
+                size="sm"
+                className="whitespace-nowrap shrink-0"
+              >
+                Request New Brand
+              </Button>
+            </div>
           </div>
-          
-          <div className="relative w-full bg-white md:w-72">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Search brands..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
+
+          {/* Barra di ricerca solo su mobile */}
+          <div className="md:hidden w-full bg-white">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Search brands..."
+                className="pl-10 bg-white border-gray-200"
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
           </div>
         </div>
       </motion.div>
@@ -333,7 +448,7 @@ export default function BrandsPage() {
           <div className="space-y-8">
             {groupedAndSortedBrands.map(([letter, brands]) => (
               <div key={letter} className="relative space-y-4 pt-14" data-letter={letter}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
                   {brands.map((brand, index) => (
                     <BrandCard
                       key={brand.id}
@@ -348,6 +463,12 @@ export default function BrandsPage() {
           </div>
         )}
       </div>
+
+      <RequestBrandsDialog
+        isOpen={isRequestDialogOpen}
+        onClose={() => setIsRequestDialogOpen(false)}
+        activeBrands={brands}
+      />
     </div>
   )
 } 

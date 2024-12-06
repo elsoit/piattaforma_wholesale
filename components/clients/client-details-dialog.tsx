@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Trash2, RefreshCw, Ban, Check, X } from 'lucide-react'
@@ -88,6 +88,19 @@ interface EmailVerification {
   expires_at: string
   ip_address: string
   user_agent: string
+}
+
+interface BrandInterest {
+  id: number
+  client_id: string
+  brand_id: string
+  brand_name: string
+  created_at: string
+}
+
+interface BrandInterestsResponse {
+  data: BrandInterest[]
+  success: boolean
 }
 
 const renderSelectField = (
@@ -190,7 +203,7 @@ const renderInputField = (
 
 const fetchBrands = async (clientId: string) => {
   const [brandsResponse, clientBrandsResponse] = await Promise.all([
-    fetch('/api/brands'),
+    fetch('/api/brands?limit=-1'),
     fetch(`/api/clients/${clientId}/brands`)
   ])
     
@@ -245,6 +258,18 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({})
   const [verifications, setVerifications] = useState<EmailVerification[]>([])
   const [isResendingVerification, setIsResendingVerification] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [requestedBrands, setRequestedBrands] = useState<Set<string>>(new Set())
+
+  // Filtro dei brand basato sulla ricerca
+  const filteredBrandsList = useMemo(() => {
+    if (!searchQuery.trim()) return brands
+    
+    const query = searchQuery.toLowerCase()
+    return brands.filter(brand => 
+      brand.name?.toLowerCase().includes(query)
+    )
+  }, [brands, searchQuery])
 
   // Effect per il mounting
   useEffect(() => {
@@ -286,6 +311,27 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
       loadVerifications()
     }
   }, [isOpen, localClient?.user?.id])
+
+  // Aggiungi questo useEffect per caricare i brand richiesti
+  useEffect(() => {
+    const fetchRequestedBrands = async () => {
+      if (!client?.id) return
+      
+      try {
+        const response = await fetch(`/api/clients/${client.id}/brands/requested`)
+        if (!response.ok) throw new Error('Errore nel caricamento delle richieste')
+        
+        const { data } = await response.json() as BrandInterestsResponse
+        setRequestedBrands(new Set(data.map(b => b.brand_id)))
+      } catch (error) {
+        console.error('Errore:', error)
+      }
+    }
+
+    if (isOpen) {
+      fetchRequestedBrands()
+    }
+  }, [isOpen, client?.id])
 
   // Aggiorna la funzione loadVerifications per gestire i tipi
   const loadVerifications = async () => {
@@ -357,102 +403,51 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   const handleSave = async () => {
     try {
       setIsLoading(true)
-      // Reset tutti gli errori
-      setFieldErrors({})
-
-      // Validazioni base
+      
+      // Validazione
+      const hasErrors = false
       const errors: Record<string, boolean> = {}
-      let hasErrors = false
 
-      // Validazione campi obbligatori
-      if (!formData.company_name.trim()) {
-        errors.company_name = true
-        toast.error('Inserisci la Ragione Sociale')
-        hasErrors = true
-      }
-
-      // Validazione email
-      if (!formData.company_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.company_email)) {
-        errors.company_email = true
-        toast.error('Email aziendale non valida')
-        hasErrors = true
-      }
-
-      // Validazione Partita IVA
-      if (formData.country === 'IT' && !/^[0-9]{11}$/.test(formData.vat_number)) {
-        errors.vat_number = true
-        toast.error('La partita IVA deve essere di 11 numeri')
-        hasErrors = true
-      }
-
-      // Validazione telefono
-      if (formData.company_phone && !/^\+?[1-9]\d{1,14}$/.test(formData.company_phone.replace(/\s/g, ''))) {
-        errors.company_phone = true
-        toast.error('Numero di telefono non valido')
-        hasErrors = true
-      }
-
-      // Validazione paese
-      if (!formData.country) {
-        errors.country = true
-        toast.error('Seleziona il paese')
-        hasErrors = true
-      }
-
-      // Validazione indirizzo
-      if (!formData.address.trim()) {
-        errors.address = true
-        toast.error('Inserisci l\'indirizzo')
-        hasErrors = true
-      }
-
-      // Validazione città
-      if (!formData.city.trim()) {
-        errors.city = true
-        toast.error('Inserisci la città')
-        hasErrors = true
-      }
-
-      // Validazione CAP
-      if (!formData.zip_code.trim()) {
-        errors.zip_code = true
-        toast.error('Inserisci il CAP')
-        hasErrors = true
-      }
-
-      // Validazioni specifiche per l'Italia
-      if (formData.country === 'IT') {
-        if (!formData.pec && !formData.sdi) {
-          errors.pec = true
-          errors.sdi = true
-          toast.error('Per le aziende italiane è necessario specificare almeno PEC o codice SDI')
+      // Validazione dei campi obbligatori
+      const requiredFields = ['company_name', 'country', 'address', 'city', 'zip_code', 'company_email', 'vat_number']
+      requiredFields.forEach(field => {
+        if (!formData[field as keyof typeof formData]) {
+          errors[field] = true
           hasErrors = true
         }
+      })
 
-        if (formData.sdi && !/^[A-Z0-9]{7}$/.test(formData.sdi)) {
-          errors.sdi = true
-          toast.error('Il codice SDI deve essere di 7 caratteri alfanumerici maiuscoli')
-          hasErrors = true
-        }
-
-        if (formData.pec && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.pec)) {
-          errors.pec = true
-          toast.error('PEC non valida')
-          hasErrors = true
-        }
-      }
-
-      // Se ci sono errori, imposta gli stati e termina
       if (hasErrors) {
         setFieldErrors(errors)
-        setIsLoading(false)
+        toast.error('Compila tutti i campi obbligatori')
         return
       }
 
-      // Continua con il salvataggio se non ci sono errori
-      // ... resto del codice per il salvataggio
+      // Chiamata API per salvare le modifiche
+      const response = await fetch(`/api/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Errore durante il salvataggio')
+      }
+
+      // Aggiorna lo stato locale
+      setLocalClient(data.data)
+      setFormData(data.data)
+      setIsEditing(false)
+      
+      toast.success('Modifiche salvate con successo')
+      await onSave(data.data)
+
     } catch (error) {
-      console.error('Errore salvataggio:', error)
+      console.error('Errore durante il salvataggio:', error)
       toast.error(error instanceof Error ? error.message : 'Errore durante il salvataggio')
     } finally {
       setIsLoading(false)
@@ -656,13 +651,24 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
   const renderBrandSelector = () => {
     const brandsList = brands || [];
     const selectedList = selectedBrands || [];
-    
-    // Disabilita il selettore se il cliente non è attivo
     const isDisabled = localClient.stato !== 'attivo';
+    
+    // Calcola il numero di brand richiesti ma non attivi
+    const pendingRequestsCount = Array.from(requestedBrands)
+      .filter(brandId => !selectedList.some(b => b.id === brandId))
+      .length;
     
     return (
       <div>
-        <h3 className="text-lg font-medium mb-4">Brand Associati</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Brand Associati</h3>
+          {pendingRequestsCount > 0 && (
+            <div className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-1 rounded-full">
+              {pendingRequestsCount} pending {pendingRequestsCount === 1 ? 'request' : 'requests'}
+            </div>
+          )}
+        </div>
+
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="relative">
             <Button
@@ -686,46 +692,67 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                     type="text"
                     placeholder="Cerca brand..."
                     className="w-full px-3 py-2 border rounded-md text-sm"
-                    onChange={(e) => {
-                      // Implementa la ricerca se necessario
-                    }}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
                 <div className="max-h-60 overflow-auto">
-                  {brandsList.map((brand) => {
-                    if (!brand?.id) return null;
-                    const isSelected = selectedList.some(
-                      (selectedBrand) => selectedBrand.id === brand.id
-                    );
-                    return (
-                      <div
-                        key={brand.id}
-                        className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-gray-100 ${
-                          isSelected ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => {
-                          const updatedBrands = isSelected
-                            ? selectedList.filter((b) => b.id !== brand.id)
-                            : [...selectedList, brand];
-                          setSelectedBrands(updatedBrands);
-                        }}
-                      >
-                        {isSelected ? (
-                          <Check className="w-4 h-4 text-blue-600" />
-                        ) : (
-                          <div className="w-4 h-4" />
-                        )}
-                        <span>{brand.name}</span>
-                      </div>
-                    );
-                  })}
+                  {filteredBrandsList.length === 0 ? (
+                    <div className="px-4 py-2 text-sm text-gray-500">
+                      Nessun brand trovato
+                    </div>
+                  ) : (
+                    filteredBrandsList.map((brand) => {
+                      if (!brand?.id) return null;
+                      const isSelected = selectedList.some(
+                        (selectedBrand) => selectedBrand.id === brand.id
+                      );
+                      const isRequested = requestedBrands.has(brand.id);
+
+                      return (
+                        <div
+                          key={brand.id}
+                          className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-gray-100 ${
+                            isSelected ? 'bg-blue-50' : ''
+                          }`}
+                          onClick={() => {
+                            const updatedBrands = isSelected
+                              ? selectedList.filter((b) => b.id !== brand.id)
+                              : [...selectedList, brand];
+                            setSelectedBrands(updatedBrands);
+                          }}
+                        >
+                          {isSelected ? (
+                            <Check className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <div className="w-4 h-4" />
+                          )}
+                          <div className="flex-1 flex items-center justify-between">
+                            <span>{brand.name}</span>
+                            {isRequested && (
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                isSelected 
+                                  ? 'bg-green-100 text-green-800'  // Brand richiesto e attivato
+                                  : 'bg-yellow-100 text-yellow-800' // Brand richiesto ma non attivato
+                              }`}>
+                                Richiesto
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
                 <div className="p-2 border-t flex justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setOpenBrandSelector(false)}
+                    onClick={() => {
+                      setOpenBrandSelector(false)
+                      setSearchQuery('') // Reset della ricerca alla chiusura
+                    }}
                   >
                     Annulla
                   </Button>
@@ -735,6 +762,7 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
                     onClick={() => {
                       handleUpdateBrands(selectedList);
                       setOpenBrandSelector(false);
+                      setSearchQuery('') // Reset della ricerca dopo il salvataggio
                     }}
                   >
                     Salva
@@ -749,9 +777,18 @@ export function ClientDetailsDialog({ client, isOpen, onClose, onSave }: ClientD
               {selectedList.map((brand) => (
                 <div
                   key={brand.id}
-                  className="bg-blue-100 text-blue-800 text-sm rounded-full px-3 py-1"
+                  className={`text-sm rounded-full px-3 py-1 flex items-center gap-2 ${
+                    requestedBrands.has(brand.id)
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
                 >
-                  {brand.name}
+                  <span>{brand.name}</span>
+                  {requestedBrands.has(brand.id) && (
+                    <span className="text-xs bg-green-200 px-1.5 py-0.5 rounded-full">
+                      Richiesto
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

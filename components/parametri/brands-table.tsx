@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   Table,
@@ -11,20 +11,32 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { PlusIcon, Pencil, Trash2, ImageIcon } from 'lucide-react'
+import { PlusIcon, Pencil, Trash2, ImageIcon, Search } from 'lucide-react'
 import { Brand } from '@/types/brand'
 import { BrandDialog } from './brand-dialog'
+import { Input } from "@/components/ui/input"
 
 export function BrandsTable() {
   const [brands, setBrands] = useState<Brand[]>([])
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredBrands = useMemo(() => {
+    if (!searchQuery.trim()) return brands
+    
+    const query = searchQuery.toLowerCase()
+    return brands.filter(brand => 
+      brand.name?.toLowerCase().includes(query) ||
+      brand.description?.toLowerCase().includes(query)
+    )
+  }, [brands, searchQuery])
 
   const fetchBrands = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/brands')
+      const response = await fetch('/api/brands?limit=-1')
       
       if (!response.ok) {
         throw new Error('Errore nel caricamento')
@@ -75,12 +87,36 @@ export function BrandsTable() {
       const url = isEditing ? `/api/brands/${selectedBrand.id}` : '/api/brands'
       const method = isEditing ? 'PUT' : 'POST'
 
-      console.log('Saving brand:', {
-        url,
-        method,
-        data: brandData,
-        selectedBrand
-      })
+      let finalBrandData = { ...brandData }
+      
+      if (brandData.logo && brandData.logo.startsWith('http')) {
+        try {
+          const response = await fetch('/api/brands/download-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ imageUrl: brandData.logo })
+          })
+
+          if (!response.ok) {
+            throw new Error('Errore nel download dell\'immagine')
+          }
+
+          const { fileUrl } = await response.json()
+          finalBrandData.logo = fileUrl
+        } catch (error) {
+          toast.error('Errore nel download dell\'immagine')
+          return
+        }
+      }
+
+      if (finalBrandData.name) {
+        finalBrandData.name = finalBrandData.name.trim()
+      }
+      if (finalBrandData.description) {
+        finalBrandData.description = finalBrandData.description.trim()
+      }
 
       const response = await fetch(url, {
         method,
@@ -88,13 +124,12 @@ export function BrandsTable() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ...brandData,
+          ...finalBrandData,
           id: selectedBrand?.id
         })
       })
 
       const data = await response.json()
-      console.log('Response:', response.status, data)
 
       if (!response.ok) {
         if (response.status === 400) {
@@ -121,82 +156,96 @@ export function BrandsTable() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex justify-between items-center gap-4">
         <h2 className="text-2xl font-bold">Brands</h2>
-        <Button
-          onClick={() => {
-            setSelectedBrand(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Nuovo Brand
-        </Button>
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Cerca brand..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button
+            onClick={() => {
+              setSelectedBrand(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Nuovo Brand
+          </Button>
+        </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Logo</TableHead>
-            <TableHead>Nome</TableHead>
-            <TableHead>Descrizione</TableHead>
-            <TableHead className="w-[100px]">Azioni</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!brands || brands.length === 0 ? (
+      <div className="flex-1 overflow-hidden">
+        <Table>
+          <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
-              <TableCell colSpan={4} className="text-center">
-                Nessun brand trovato
-              </TableCell>
+              <TableHead>Logo</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Descrizione</TableHead>
+              <TableHead className="w-[100px]">Azioni</TableHead>
             </TableRow>
-          ) : (
-            brands.map((brand) => (
-              <TableRow key={brand.id}>
-                <TableCell>
-                  <div className="relative w-[50px] h-[50px] rounded-md overflow-hidden border border-gray-200">
-                    {brand.logo ? (
-                      <img
-                        src={brand.logo}
-                        alt={brand.name}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                        <ImageIcon className="h-4 w-4 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{brand.name}</TableCell>
-                <TableCell>{brand.description}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedBrand(brand)
-                        setIsDialogOpen(true)
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(brand.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+          </TableHeader>
+          <TableBody className="overflow-auto">
+            {!filteredBrands || filteredBrands.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center">
+                  {brands.length === 0 ? 'Nessun brand trovato' : 'Nessun risultato per la ricerca'}
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              filteredBrands.map((brand) => (
+                <TableRow key={brand.id}>
+                  <TableCell>
+                    <div className="relative w-[50px] h-[50px] rounded-md overflow-hidden border border-gray-200">
+                      {brand.logo ? (
+                        <img
+                          src={brand.logo}
+                          alt={brand.name?.replace(/'/g, "'")}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                          <ImageIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{brand.name?.replace(/'/g, "'")}</TableCell>
+                  <TableCell>{brand.description?.replace(/'/g, "'")}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedBrand(brand)
+                          setIsDialogOpen(true)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(brand.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <BrandDialog
         brand={selectedBrand}

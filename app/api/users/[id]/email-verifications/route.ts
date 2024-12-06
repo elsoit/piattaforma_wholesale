@@ -6,7 +6,7 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const userId = await params.id
+  const userId = params.id
 
   try {
     const result = await db.query(`
@@ -24,8 +24,8 @@ export async function GET(
     `, [userId])
 
     return NextResponse.json(result.rows)
-  } catch (error) {
-    console.error('Errore nel recupero delle verifiche:', error)
+  } catch (err) {
+    console.error('Errore nel recupero delle verifiche:', err)
     return NextResponse.json(
       createErrorResponse('Errore nel recupero delle verifiche'),
       { status: 500 }
