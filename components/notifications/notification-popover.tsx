@@ -15,6 +15,18 @@ import { format } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 
+interface NotificationData {
+  message: string
+  data?: {
+    catalogo_id?: number
+    brand_id?: string
+    brand_name?: string
+    catalogo_nome?: string
+    catalogo_codice?: string
+    url?: string
+  }
+}
+
 export function NotificationPopover() {
   const router = useRouter()
   const { notifications, unreadCount, loading, markAsRead, refreshNotifications } = useNotifications()
@@ -61,6 +73,17 @@ export function NotificationPopover() {
         return 'text-amber-500'
       default:
         return 'text-blue-500'
+    }
+  }
+
+  const parseNotificationMessage = (notification: any) => {
+    try {
+      // Prova a parsare il messaggio come JSON
+      const data: NotificationData = JSON.parse(notification.message)
+      return data.message
+    } catch {
+      // Se non è JSON, usa il messaggio così com'è
+      return notification.message
     }
   }
 
@@ -130,28 +153,33 @@ export function NotificationPopover() {
                           'text-sm leading-tight',
                           !notification.read && 'font-medium'
                         )}>
-                          {notification.message}
+                          {parseNotificationMessage(notification)}
                         </p>
-                        {notification.brandName && (
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Brand: {notification.brandName}
-                          </p>
-                        )}
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(notification.createdAt), 'MMM d, yyyy HH:mm', { locale: enUS })}
                         </p>
                       </div>
                     </button>
-                    {notification.type === 'BRAND_ACTIVATION' && notification.brandId && (
+                    {notification.type === 'CATALOG_ADDED' && (
                       <div className="ml-11">
                         <Button
                           variant="outline"
                           size="sm"
                           className="w-full justify-center gap-2 rounded-md transition-colors hover:bg-muted"
-                          onClick={() => handleViewCatalogs(notification.brandId!, notification.id)}
+                          onClick={() => {
+                            try {
+                              const data = JSON.parse(notification.message).data
+                              if (data?.url) {
+                                markAsRead(notification.id)
+                                router.push(data.url)
+                              }
+                            } catch (error) {
+                              console.error('Error parsing notification data:', error)
+                            }
+                          }}
                         >
                           <Book className="h-4 w-4" />
-                          View Catalogs
+                          View Catalog
                         </Button>
                       </div>
                     )}

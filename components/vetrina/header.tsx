@@ -61,6 +61,12 @@ export function Header({ userName = 'User Name' }: HeaderProps) {
               >
                 Brands
               </Link>
+              <Link 
+                href="/vetrina/orders" 
+                className="text-sm font-medium transition-colors hover:text-primary"
+              >
+                Orders
+              </Link>
             </nav>
           </div>
 
@@ -104,7 +110,6 @@ export function Header({ userName = 'User Name' }: HeaderProps) {
                   className="flex items-center text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                   onSelect={(e) => e.preventDefault()}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
                   <LogoutButton />
                 </DropdownMenuItem>
               </DropdownMenuContent>

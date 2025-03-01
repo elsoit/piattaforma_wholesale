@@ -126,6 +126,85 @@ CREATE TABLE IF NOT EXISTS public.notifications
     CONSTRAINT notifications_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS public.order_products
+(
+    id serial NOT NULL,
+    order_id integer NOT NULL,
+    product_id integer NOT NULL,
+    quantity integer NOT NULL DEFAULT 1,
+    price numeric(10, 2) NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT order_products_pkey PRIMARY KEY (id),
+    CONSTRAINT order_products_order_id_product_id_key UNIQUE (order_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.orders
+(
+    id serial NOT NULL,
+    order_number character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    client_id integer NOT NULL,
+    subtotal numeric(10, 2) NOT NULL DEFAULT 0.00,
+    vat numeric(10, 2) NOT NULL DEFAULT 0.00,
+    discount numeric(10, 2) NOT NULL DEFAULT 0.00,
+    shipping numeric(10, 2) NOT NULL DEFAULT 0.00,
+    total numeric(10, 2) NOT NULL DEFAULT 0.00,
+    status order_status NOT NULL DEFAULT 'bozza'::order_status,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    order_type order_type NOT NULL DEFAULT 'available'::order_type,
+    catalog_id integer,
+    CONSTRAINT orders_pkey PRIMARY KEY (id),
+    CONSTRAINT orders_order_number_key UNIQUE (order_number)
+);
+
+CREATE TABLE IF NOT EXISTS public.products
+(
+    id serial NOT NULL,
+    article_code character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    variant_code character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    size_id integer,
+    size_group_id integer,
+    brand_id character varying(50) COLLATE pg_catalog."default",
+    wholesale_price numeric(10, 2) NOT NULL,
+    retail_price numeric(10, 2),
+    status product_status NOT NULL DEFAULT 'active'::product_status,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT products_pkey PRIMARY KEY (id),
+    CONSTRAINT products_article_code_variant_code_size_id_brand_id_key UNIQUE (article_code, variant_code, size_id, brand_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.size_group_sizes
+(
+    id serial NOT NULL,
+    size_id integer,
+    size_group_id integer,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT size_group_sizes_pkey PRIMARY KEY (id),
+    CONSTRAINT size_group_sizes_size_group_id_size_id_key UNIQUE (size_group_id, size_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.size_groups
+(
+    id serial NOT NULL,
+    name character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    description character varying(255) COLLATE pg_catalog."default",
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT size_groups_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.sizes
+(
+    id serial NOT NULL,
+    name character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT sizes_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS public.users
 (
     id serial NOT NULL,
@@ -229,5 +308,78 @@ ALTER TABLE IF EXISTS public.notifications
     ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id
     ON public.notifications(user_id);
+
+
+ALTER TABLE IF EXISTS public.order_products
+    ADD CONSTRAINT order_products_order_id_fkey FOREIGN KEY (order_id)
+    REFERENCES public.orders (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_order_products_order_id
+    ON public.order_products(order_id);
+
+
+ALTER TABLE IF EXISTS public.order_products
+    ADD CONSTRAINT order_products_product_id_fkey FOREIGN KEY (product_id)
+    REFERENCES public.products (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_order_products_product_id
+    ON public.order_products(product_id);
+
+
+ALTER TABLE IF EXISTS public.orders
+    ADD CONSTRAINT orders_catalog_id_fkey FOREIGN KEY (catalog_id)
+    REFERENCES public.cataloghi (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_orders_catalog_id
+    ON public.orders(catalog_id);
+
+
+ALTER TABLE IF EXISTS public.orders
+    ADD CONSTRAINT orders_client_id_fkey FOREIGN KEY (client_id)
+    REFERENCES public.clients (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_orders_client_id
+    ON public.orders(client_id);
+
+
+ALTER TABLE IF EXISTS public.products
+    ADD CONSTRAINT products_brand_id_fkey FOREIGN KEY (brand_id)
+    REFERENCES public.brands (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+CREATE INDEX IF NOT EXISTS idx_products_brand_id
+    ON public.products(brand_id);
+
+
+ALTER TABLE IF EXISTS public.products
+    ADD CONSTRAINT products_size_group_id_fkey FOREIGN KEY (size_group_id)
+    REFERENCES public.size_groups (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+
+ALTER TABLE IF EXISTS public.products
+    ADD CONSTRAINT products_size_id_fkey FOREIGN KEY (size_id)
+    REFERENCES public.sizes (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+
+ALTER TABLE IF EXISTS public.size_group_sizes
+    ADD CONSTRAINT size_group_sizes_size_group_id_fkey FOREIGN KEY (size_group_id)
+    REFERENCES public.size_groups (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+
+ALTER TABLE IF EXISTS public.size_group_sizes
+    ADD CONSTRAINT size_group_sizes_size_id_fkey FOREIGN KEY (size_id)
+    REFERENCES public.sizes (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
 
 END;

@@ -3,6 +3,7 @@ import { accountActivatedTemplate } from './email-templates/account-activated'
 import { firstActivationTemplate } from './email-templates/first-activation'
 import { brandActivatedTemplate } from './email-templates/brand-activated'
 import { verifyEmailTemplate } from './email-templates/verify-email'
+import { catalogPublishedTemplate } from './email-templates/catalog-published'
 
 // Configura il trasporto SMTP
 const transporter = nodemailer.createTransport({
@@ -27,7 +28,7 @@ transporter.verify(function(error, success) {
   }
 });
 
-type EmailTemplate = 'account-activated' | 'first-activation' | 'brand-activated' | 'verify-email'
+type EmailTemplate = 'account-activated' | 'first-activation' | 'brand-activated' | 'verify-email' | 'catalog-published'
 
 interface SendEmailProps {
   to: string
@@ -70,6 +71,11 @@ export async function sendEmail({ to, subject, template, data }: SendEmailProps)
         const verifyEmailTemp = verifyEmailTemplate(data)
         htmlContent = verifyEmailTemp.html
         textContent = verifyEmailTemp.text
+        break
+      case 'catalog-published':
+        const catalogPublishedTemp = catalogPublishedTemplate(data)
+        htmlContent = catalogPublishedTemp.html
+        textContent = catalogPublishedTemp.text
         break
       default:
         throw new Error('Template non valido')

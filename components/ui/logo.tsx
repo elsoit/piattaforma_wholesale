@@ -7,7 +7,7 @@ interface LogoProps {
 export function Logo({ className }: LogoProps) {
   return (
     <div className={cn("font-semibold text-lg", className)}>
-      Logo
+      ARTEX
     </div>
   )
 } 

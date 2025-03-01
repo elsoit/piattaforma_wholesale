@@ -74,6 +74,7 @@
     "react-dom": "19.0.0-rc-66855b96-20241106",
     "react-file-viewer": "^1.2.1",
     "react-hook-form": "^7.53.2",
+    "react-hot-toast": "^2.4.1",
     "react-pdf": "^9.1.1",
     "react-phone-number-input": "^3.4.9",
     "react-select": "^5.8.3",

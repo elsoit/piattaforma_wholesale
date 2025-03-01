@@ -1,19 +1,20 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, ArrowLeft, Truck, Timer } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Truck, Timer, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { CatalogoFiles } from './catalogo-files'
 import { Badge } from "@/components/ui/badge"
 import { format, isPast, isWithinInterval, parseISO, isBefore, isAfter } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import toast from 'react-hot-toast'
+import { parseCookies } from 'nookies'
 
 interface Brand {
   id: string
@@ -38,6 +39,7 @@ interface Catalogo {
   updated_at: string
   note: string | null
   condizioni: string | null
+  brand_id: string
 }
 
 interface CataloghiGruppo {
@@ -51,6 +53,7 @@ function CatalogoCard({ catalogo }: { catalogo: Catalogo }) {
   const [isMobile, setIsMobile] = useState(false)
   const [noteHeight, setNoteHeight] = useState<string>('h-[100px]')
   const [condizioniHeight, setCondizioniHeight] = useState<string>('h-[100px]')
+  const router = useRouter()
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -110,6 +113,43 @@ function CatalogoCard({ catalogo }: { catalogo: Catalogo }) {
   };
 
   const status = getStatus();
+
+  const handleCreateOrder = async () => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Importante: includiamo i cookies
+        body: JSON.stringify({
+          catalog_id: catalogo.id,
+          order_type: catalogo.tipo.toLowerCase() === 'preorder' ? 'preorder' : 'available',
+          brand_id: catalogo.brand_id,
+          stagione: catalogo.stagione,
+          anno: catalogo.anno,
+          data_consegna: catalogo.data_consegna
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        if (response.status === 401) {
+          toast.error('Sessione scaduta')
+          router.push('/login')
+          return
+        }
+        throw new Error(error.error || 'Errore nella creazione dell\'ordine')
+      }
+
+      const data = await response.json()
+      toast.success('Ordine creato con successo')
+      router.push(`/vetrina/orders/${data.id}`)
+    } catch (error) {
+      console.error('Errore:', error)
+      toast.error(error instanceof Error ? error.message : 'Errore nella creazione dell\'ordine')
+    }
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden lg:ml-2 border border-gray-200/50">
@@ -232,10 +272,36 @@ function CatalogoCard({ catalogo }: { catalogo: Catalogo }) {
         </div>
 
         <div className="md:w-1/2 p-4 border-t md:border-t-0 md:border-l border-gray-200">
-          <CatalogoFiles 
-            catalogoId={catalogo.id} 
-            hasNotesOrConditions={!!(catalogo.note || catalogo.condizioni)} 
-          />
+          <div className="flex flex-col h-full">
+            <div className="mb-4">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCreateOrder()
+                }}
+                className="w-full bg-primary hover:bg-primary/90 text-white"
+                disabled={!status || status.text !== 'Attivo'}
+              >
+                {status?.text === 'Attivo' ? (
+                  <>
+                    Ordina Ora
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                ) : status?.text === 'Opening Soon' ? (
+                  'Apertura Ordini a Breve'
+                ) : (
+                  'Ordini Chiusi'
+                )}
+              </Button>
+            </div>
+            
+            <div className="flex-1">
+              <CatalogoFiles 
+                catalogoId={catalogo.id} 
+                hasNotesOrConditions={!!(catalogo.note || catalogo.condizioni)} 
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
