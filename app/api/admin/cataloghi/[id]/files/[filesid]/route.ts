@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 interface FileUpdateData {
@@ -8,7 +8,7 @@ interface FileUpdateData {
 }
 
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string; filesid: string } }
 ) {
   try {
@@ -87,7 +87,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string; filesid: string } }
 ) {
   try {
