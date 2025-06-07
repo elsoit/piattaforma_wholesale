@@ -123,7 +123,7 @@ export function useNotifications() {
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const socketUrl = `${window.location.protocol}//${host}`
+    const socketUrl = protocol + '//' + host
 
     console.log('🔌 Connessione socket a:', socketUrl)
     
