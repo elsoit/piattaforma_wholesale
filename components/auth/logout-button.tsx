@@ -36,9 +36,15 @@ export function LogoutButton() {
     try {
       // Pulisce tutti i dati del browser
       clearBrowserData()
-      
+
+      // Comunica al server di invalidare la sessione
+      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      if (!res.ok) {
+        console.warn('Server logout failed')
+      }
+
       // Effettua il logout
-      await signOut({ 
+      await signOut({
         redirect: true,
         callbackUrl: '/login'
       })

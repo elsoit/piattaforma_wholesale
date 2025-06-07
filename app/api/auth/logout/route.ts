@@ -16,6 +16,8 @@ export async function POST() {
   response.cookies.set('session', '', cookieOptions)
   response.cookies.set('user_role', '', cookieOptions)
   response.cookies.set('client_id', '', cookieOptions)
+  response.cookies.set('user_name', '', cookieOptions)
+  response.cookies.set('company_name', '', cookieOptions)
 
   return response
 } 
