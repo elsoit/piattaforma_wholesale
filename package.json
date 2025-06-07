@@ -12,7 +12,7 @@
     "start:test": "NODE_ENV=test next start -p 3001",
     "start:prod": "NODE_ENV=production next start -p 3000",
     "lint": "next lint",
-    "test": "DISABLE_ESLINT_PLUGIN=true next test"
+    "test": "tsx --test tests/db-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.701.0",
@@ -106,6 +106,7 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
     "typescript": "^5"
   }
 }
