@@ -14,6 +14,23 @@ pnpm dev
 bun dev
 ```
 
+## Environment Variables
+
+Create a `.env` file based on `.env.example` and provide your database
+connection details:
+
+```bash
+cp .env.example .env
+```
+
+The following variables are required:
+
+- `DB_HOST` - database host
+- `DB_USER` - database username
+- `DB_NAME` - database name
+- `DB_PASSWORD` - database password
+- `DB_PORT` - database port
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
