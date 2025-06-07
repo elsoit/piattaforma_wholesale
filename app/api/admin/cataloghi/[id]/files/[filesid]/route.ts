@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 interface FileUpdateData {
@@ -8,11 +8,11 @@ interface FileUpdateData {
 }
 
 export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string; filesid: string } }
+  request: Request,
+  context: { params: { id: string; filesid: string } }
 ) {
   try {
-    const { id, filesid } = params
+    const { id, filesid } = context.params
     const data = await request.json() as FileUpdateData
     console.log('Dati ricevuti:', id, filesid, data)
     
@@ -87,11 +87,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string; filesid: string } }
+  request: Request,
+  context: { params: { id: string; filesid: string } }
 ) {
   try {
-    const { id: catalogoId, filesid: fileId } = params
+    const { id: catalogoId, filesid: fileId } = context.params
     
     // Recupera info file
     const { rows: [file] } = await db.query(
