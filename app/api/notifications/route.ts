@@ -223,7 +223,7 @@ export async function POST(request: Request) {
       }
       
       // @ts-ignore - Next.js types are not up to date
-      const server = (req as any).socket?.server as ServerWithIO
+      const server = (request as any).socket?.server as ServerWithIO
       const io = getIO(server)
       
       if (io) {
