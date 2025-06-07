@@ -3,10 +3,10 @@
 // Carica le variabili d'ambien
 
 const bcrypt = require('bcrypt');
-const secret = "ciaobellomio";
+require('dotenv').config();
 (async () => {
   try {
-    const secret = "ciaobellomio";
+    const secret = process.env.NEXTAUTH_SECRET;
     if (!secret) {
       console.error('Errore: la variabile NEXTAUTH_SECRET non è impostata in .env');
       process.exit(1);
