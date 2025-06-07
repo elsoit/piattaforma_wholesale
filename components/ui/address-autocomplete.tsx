@@ -184,7 +184,7 @@ export function AddressAutocomplete({
   }
 
   useEffect(() => {
-    // Aggiorna il parent con i valori correnti degli input quando cambiano
+    // Update parent component when manual address fields are filled
     if (manualAddress.street && manualAddress.city && manualAddress.postal_code) {
       onAddressSelect({
         street_address: manualAddress.street,
