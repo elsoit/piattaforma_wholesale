@@ -18,6 +18,21 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Environment variables
+
+Copy `env.example` to `.env.local` and fill in your Cloudflare R2 credentials before starting the server:
+
+```bash
+cp env.example .env.local
+# edit .env.local and set:
+# R2_ENDPOINT=<your R2 endpoint>
+# R2_ACCESS_KEY_ID=<your access key id>
+# R2_SECRET_ACCESS_KEY=<your secret access key>
+# R2_BUCKET=<bucket name>
+```
+
+These variables are required at startup and the application will throw an error if any of them are missing.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

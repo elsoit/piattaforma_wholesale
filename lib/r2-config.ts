@@ -1,13 +1,36 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3'
+
+// Environment variables required for R2 configuration
+const {
+  R2_ENDPOINT,
+  R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY,
+  R2_BUCKET,
+} = process.env
+
+if (!R2_ENDPOINT) {
+  throw new Error('Missing environment variable: R2_ENDPOINT')
+}
+
+if (!R2_ACCESS_KEY_ID) {
+  throw new Error('Missing environment variable: R2_ACCESS_KEY_ID')
+}
+
+if (!R2_SECRET_ACCESS_KEY) {
+  throw new Error('Missing environment variable: R2_SECRET_ACCESS_KEY')
+}
+
+if (!R2_BUCKET) {
+  throw new Error('Missing environment variable: R2_BUCKET')
+}
 
 export const r2Client = new S3Client({
   region: 'auto',
-  endpoint: 'https://a8e3ac15a95a1b6a6bd0e51aadb0d9b6.r2.cloudflarestorage.com',
+  endpoint: R2_ENDPOINT,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-  }
-});
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+})
 
-export const R2_ENDPOINT = 'ancient-moon-a771.steep-firefly-f7f0.workers.dev';
-export const R2_BUCKET = 'piattaforma-whls'; 
+export { R2_ENDPOINT, R2_BUCKET }
