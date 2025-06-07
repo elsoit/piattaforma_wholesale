@@ -7,8 +7,8 @@ export const runtime = 'nodejs';
 export const db = new Pool({
   user: 'postgres',
   host: 'localhost',
-  database: 'piattaforma',
-  password: '123456',
+  database: 'piattoforma',
+  password: '',
   port: parseInt('5432'),
 });
 
